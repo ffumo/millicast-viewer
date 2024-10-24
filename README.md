@@ -24,11 +24,20 @@ Utility for capturing Millicast stream
     echo "$(uname)"
     ```
 
-    - [Millicast SDK](https://github.com/millicast/millicast-native-sdk/releases) for stream subscription [Darwin]
+    - [Millicast SDK](https://github.com/millicast/millicast-native-sdk/releases) for stream subscription [MacOs Arm64]
         ```shell
         wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.0.0/millicast-native-sdk-2.0.0-macos-arm64.zip -O 3rd/millicast.zip
 
         unzip 3rd/millicast.zip -d 3rd && mv 3rd/usr lib/millicast
+        ```
+
+    - [Millicast SDK](https://github.com/millicast/millicast-native-sdk/releases) for stream subscription [Ubuntu 22.04 x86] (Ignore this step if you installed millicast via **apt**)
+        ```shell
+        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.0.0/millicast-native-sdk-2.0.0-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
+
+        ar vx 3rd/millicast.deb --output 3rd/
+
+        tar -xvf 3rd/data.tar.gz --directory 3rd/ && mv 3rd/usr lib/millicast
         ```
 
     - [OpenCV](https://docs.opencv.org/4.x/d7/d9f/tutorial_linux_install.html) for image processing
@@ -41,7 +50,7 @@ Utility for capturing Millicast stream
 
         unzip 3rd/opencv_contrib.zip -d 3rd
 
-        sh scripts/opencv_cmake_install.sh
+        ./scripts/opencv_cmake_install.sh
         ```
 
     - [ZeroMQ](https://github.com/zeromq/libzmq/releases/tag/v4.3.5) for re-publishing image to python
@@ -50,7 +59,7 @@ Utility for capturing Millicast stream
 
         unzip 3rd/zeromq.zip -d 3rd
 
-        sh scripts/zeromq_cmake_install.sh
+        ./scripts/zeromq_cmake_install.sh
         ```
 
     - [CppZMQ](https://github.com/zeromq/cppzmq/releases/tag/v4.10.0) C++ wrapping of ZeroMQ
@@ -59,14 +68,14 @@ Utility for capturing Millicast stream
         
         unzip 3rd/cppzmq.zip -d 3rd
 
-        sh scripts/zmqcpp_cmake_install.sh
+        ./scripts/zmqcpp_cmake_install.sh
         ```
 
     - [Json](https://github.com/nlohmann/json/releases/tag/v3.11.3) for parsing JSON configuration file
         ```shell
         wget -O 3rd/json.zip https://github.com/nlohmann/json/releases/download/v3.11.3/include.zip
 
-        unzip 3rd/json.zip "include/nlohmann/*" -d 3rd/json/
+        unzip 3rd/json.zip "include/*" -d 3rd/ && mv 3rd/include 3rd/json
         ```
 
     - [Argparse](https://github.com/p-ranav/argparse/releases/tag/v3.1) for parsing commandline arguments
@@ -79,10 +88,16 @@ Utility for capturing Millicast stream
 
 Run scripts in [scripts](scripts) directory for build libs (except final build script [build.sh](script/build.sh))
 
-```
+```sh
 source scripts/source_lib.sh
 
-sh build.sh
+./script/build.sh
+```
+
+Note: Linking error under Linux, if you meet linking error "warning: libndi.so.5 ...", then create symbol link for missing symbol
+```sh
+cd lib/millicast/libexec/millicastsdk
+ln -s libndi.so.5.1.1 libndi.so.5
 ```
 
 ### Run app
@@ -101,4 +116,17 @@ App available options:
 
 Configuration file contains stream information. Please refer to [sample_config.json](config/sample_config.json)
 
-
+Note: Error with pulse
+```
+[RTC|ERROR] (audio_device_pulse_linux.cc:1605): failed to connect context, error=-1
+[RTC|ERROR] (audio_device_pulse_linux.cc:145): failed to initialize PulseAudio
+[RTC|ERROR] (audio_device_impl.cc:301): Audio device initialization failed.
+```
+Then: Install pulseaudio if you are sudoer
+```sh
+sudo apt install pulseaudio
+```
+In normal user, after installed pulseaudio, run below command
+```
+pulseaudio --start
+```

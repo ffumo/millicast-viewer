@@ -363,8 +363,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         opts.auto_reconnect = true;
         std::cout<<"Connect stream"<<std::endl;
         wait(viewer->connect(opts));
+        // std::cout<<"subscribe stream"<<std::endl;
+        // wait(viewer->subscribe());
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        millicast::ViewerOption sopts{};
+        sopts.disable_audio=true;
         std::cout<<"subscribe stream"<<std::endl;
-        wait(viewer->subscribe());
+        wait(viewer->subscribe(sopts));
 
         std::cout<<"Start render loop"<<std::endl;
         // Wait for any character to exit

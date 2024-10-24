@@ -7,12 +7,19 @@ include(CTest)
 
 enable_testing()
 
-
-message("${PROJECT_SOURCE_DIR}/lib/millicast/lib/cmake")
-#find_package(Cairo)
 set(MillicastLIB_DIR "${PROJECT_SOURCE_DIR}/lib/millicast")
-set(MillicastSDK_DIR "${MillicastLIB_DIR}/lib/cmake/millicastsdk")
 set(CommonSRC_DIR "${MillicastLIB_DIR}/share/millicastsdk/examples/common")
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    message("Building on macOS")
+    set(MillicastSDK_DIR "${MillicastLIB_DIR}/lib/cmake/millicastsdk")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message("Building on Linux")
+    find_package(MillicastSDK REQUIRED HINTS "${MillicastLIB_DIR}/lib/x86_64-linux-gnu/cmake")
+else()
+    message(FATAL_ERROR "Unsupported operating system: ${CMAKE_SYSTEM_NAME}")
+endif()
+
 find_package(MillicastSDK REQUIRED)
 
 option( WITH_METADATA "Enable metadata into frame" OFF )

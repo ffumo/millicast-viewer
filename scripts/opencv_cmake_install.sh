@@ -5,6 +5,8 @@ set -e
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 ROOT_DIR="${SCRIPT_DIR}/.."
 
+echo "ROOT_DIR: ${ROOT_DIR}"
+
 THIRD_DIR="${ROOT_DIR}/3rd"
 APP_LIB_DIR="${ROOT_DIR}/lib"
 INSTALL_DIR="${APP_LIB_DIR}/opencv"
