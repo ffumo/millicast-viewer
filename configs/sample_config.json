@@ -1,0 +1,28 @@
+{
+  "streams": {
+    "stream_1" : {
+      "type": "ZMQCapture",
+      "source": {
+        "defaults": {
+          "service": "millicast"
+        },
+        "entries": [{
+          "url": "https://viewer.millicast.com/?streamId=your_acc/your_stream&token=your_token_if_have",
+          "account_id": "your_acc",
+          "stream_name": "your_stream",
+          "token": "your_token_if_have"
+        }]
+      },
+      "zmq": {
+        "address": "tcp://localhost:50553",
+        "topic": ""
+      },
+
+      "log_dir": "logs/g1sb",
+      "roi_": {
+        "rows": [100, 460],
+        "cols": [100, 460]
+      }
+    }
+  }
+}

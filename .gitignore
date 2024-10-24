@@ -1,0 +1,8 @@
+out/*
+.vscode/*
+*build/*
+*/install/*
+*.DS_Store
+doc/*
+lib/*
+3rd/*
