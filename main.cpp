@@ -8,6 +8,7 @@
 #include <fstream>
 #include <string>
 #include <thread>
+#include <chrono>
 #include <stdio.h>
 
 #include <millicast-sdk/mc_logging.h>
@@ -172,16 +173,16 @@ public:
         cv_.notify_one();
     }
 
-    void add_audio_track(millicast::RtsRemoteAudioTrack* track) {
-        audio_tracks_.push_back(std::move(track));
-    }
+    // void add_audio_track(millicast::RtsRemoteAudioTrack* track) {
+    //     audio_tracks_.push_back(std::move(track));
+    // }
 
 private:
     std::mutex mutex_;
     std::condition_variable_any cv_;
     std::deque<millicast::RtsRemoteVideoTrack*> tracks_to_render_;
     std::vector<millicast::RtsRemoteVideoTrack*> tracks_;
-    std::vector<millicast::RtsRemoteAudioTrack*> audio_tracks_;
+    // std::vector<millicast::RtsRemoteAudioTrack*> audio_tracks_;
     std::vector<millicast::EventConnectionPtr> handlers_;
     std::vector<std::shared_ptr<VideoRenderer>> renderers_;
 };

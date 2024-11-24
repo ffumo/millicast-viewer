@@ -4,6 +4,7 @@
 #include <mutex>
 #include <chrono>
 #include <fstream>
+#include <unistd.h>
 #include <opencv2/opencv.hpp>
 #include "nlohmann/json.hpp"
 // #include <unistd.h>
@@ -44,7 +45,12 @@ void VideoRenderer::init() {
     zmq_sock_p_ = std::make_shared<zmq::socket_t>(zmq_ctx_, zmq::socket_type::pub);
     if(!config_.empty()){
         zmq_address_ = config_["zmq"]["address"];
-        zmq_topic_ = config_["zmq"]["topic"];
+        if(config_["zmq"].contains("topic")){
+            zmq_topic_ = config_["zmq"]["topic"];
+        }
+        else{
+            zmq_topic_ = "";
+        }
     }
     else{
         zmq_address_ = "tcp://localhost:50550";
