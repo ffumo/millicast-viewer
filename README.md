@@ -91,13 +91,12 @@ Run scripts in [scripts](scripts) directory for build libs (except final build s
 ```sh
 source scripts/source_lib.sh
 
-./script/build.sh
+./scripts/build.sh
 ```
 
 Note: Linking error under Linux, if you meet linking error "warning: libndi.so.5 ...", then create symbol link for missing symbol
 ```sh
-cd lib/millicast/libexec/millicastsdk
-ln -s libndi.so.5.1.1 libndi.so.5
+ln -rs lib/millicast/libexec/millicastsdk/libndi.so.5.1.1 lib/millicast/libexec/millicastsdk/libndi.so.5
 ```
 
 ### Run app
