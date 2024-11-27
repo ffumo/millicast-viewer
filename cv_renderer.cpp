@@ -56,6 +56,7 @@ void VideoRenderer::init() {
         zmq_address_ = "tcp://localhost:50550";
         zmq_topic_ = "";
     }
+    printf("Create ZMQ at: %s\n", zmq_address_.c_str());
     zmq_sock_p_->bind(zmq_address_.c_str());
 
     // Set sending timepoint after image timepoint, avoid send empty image
