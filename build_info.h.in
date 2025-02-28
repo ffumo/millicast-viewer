@@ -1,0 +1,9 @@
+#pragma once
+
+#include <string>
+
+namespace build_info {
+    const std::string version = "1.0";
+    const std::string build_time = "@BUILD_TIME@";
+    const std::string build_date = "@BUILD_DATE@";
+}

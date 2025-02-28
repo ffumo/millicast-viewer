@@ -28,6 +28,16 @@ option( WITH_METADATA "Enable metadata into frame" OFF )
 
 option( WITH_CV_RENDERER "Render video in a OpenCV" ON )
 
+# Get current date and time
+execute_process(COMMAND date "+%Y-%m-%d" OUTPUT_VARIABLE BUILD_DATE OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND date "+%H:%M:%S %Z" OUTPUT_VARIABLE BUILD_TIME OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+# Configure the header file
+configure_file(build_info.h.in build_info.h)
+
+# Include the generated header directory
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 add_executable(millicast_viewer
     main.cpp
     ${CommonSRC_DIR}/utils.cpp
