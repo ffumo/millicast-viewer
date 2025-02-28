@@ -32,6 +32,12 @@ class VideoRenderer : public millicast::VideoRenderer {
     std::chrono::high_resolution_clock::time_point image_tp_;
     // void init_();
     std::chrono::high_resolution_clock::time_point send_tp_;
+    std::chrono::high_resolution_clock::time_point report_tp_;
+
+    float frame_fps_;
+
+    // Report duration is 5s
+    float report_dur_ = 5.0f;
 
 public:
     std::string title_;

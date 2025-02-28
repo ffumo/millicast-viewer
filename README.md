@@ -26,14 +26,14 @@ Utility for capturing Millicast stream
 
     - [Millicast SDK](https://github.com/millicast/millicast-native-sdk/releases) for stream subscription [MacOs Arm64]
         ```shell
-        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.0.0/millicast-native-sdk-2.0.0-macos-arm64.zip -O 3rd/millicast.zip
+        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.2.0/millicast-native-sdk-2.2.0-macos-arm64.zip -O 3rd/millicast.zip
 
         unzip 3rd/millicast.zip -d 3rd && mv 3rd/usr lib/millicast
         ```
 
     - [Millicast SDK](https://github.com/millicast/millicast-native-sdk/releases) for stream subscription [Ubuntu 22.04 x86] (Ignore this step if you installed millicast via **apt**)
         ```shell
-        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.0.0/millicast-native-sdk-2.0.0-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
+        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.2.0/millicast-native-sdk-2.2.0-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
 
         ar vx 3rd/millicast.deb --output 3rd/
 

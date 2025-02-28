@@ -3,8 +3,14 @@
 #include <thread>
 #include <mutex>
 #include <chrono>
+#include <sstream>
 #include <fstream>
 #include <unistd.h>
+
+#include <exception>
+#include <typeinfo>
+#include <stdexcept>
+
 #include <opencv2/opencv.hpp>
 #include "nlohmann/json.hpp"
 // #include <unistd.h>
@@ -31,6 +37,7 @@ VideoRenderer::VideoRenderer(const std::string &title) {
     height_ = 0;
     printf("Create new CV video renderer: %s\n", title.c_str());
     image_tp_ = std::chrono::high_resolution_clock::now();
+    report_tp_ = std::chrono::high_resolution_clock::now();
 }
 
 VideoRenderer::~VideoRenderer() {
@@ -50,6 +57,11 @@ void VideoRenderer::init() {
         }
         else{
             zmq_topic_ = "";
+        }
+
+        if(config_.contains("report_duration"))
+        {
+            report_dur_ = config_["report_duration"];
         }
     }
     else{
@@ -74,7 +86,7 @@ void VideoRenderer::init(const std::string &config_file, int stream_id) {
         init();
     }
     catch(const std::ifstream::failure& e){
-        std::cerr<<"Error in read configuration file: "<< config_file <<std::endl;
+        std::cerr<<"Error in read configuration file: " << e.what() << "\n Configuration: "<< config_file <<std::endl;
         exit(EXIT_FAILURE);
     }
 }
@@ -85,24 +97,57 @@ void VideoRenderer::on_frame(const millicast::VideoFrame& frame) {
     if (!mutex_.try_lock())
         return;
 
-    if (width_ != frame.width() || height_ != frame.height()) {
-        printf("Got new image size: %d x %d, size: %u\n", frame.width(), frame.height(), frame.size(millicast::VideoType::I420));
-        width_ = frame.width();
-        height_ = frame.height();
-        image_data_.resize(width_ * height_ * 3/2);
-    }
-    frame.get_buffer(millicast::VideoType::I420, &image_data_[0]);
-    std::chrono::duration<double> time_diff = std::chrono::high_resolution_clock::now() - image_tp_;
-    image_tp_ = std::chrono::high_resolution_clock::now();
-    printf("Get image buffer FPS: %.2lf\n", 1.0/time_diff.count());
+    std::chrono::duration<float> time_diff;
+    try{
+        // Update frame dimension and frame data buffer size
+        if (width_ != frame.width() || height_ != frame.height()) {
+            printf("Got new image size: %d x %d, size: %u\n", frame.width(), frame.height(), frame.size(millicast::VideoType::I420));
+            width_ = frame.width();
+            height_ = frame.height();
+            image_data_.resize(width_ * height_ * 3/2);
+        }
 
-    // printf("[%s] Create cv mat: %ld\n", title_.c_str(), image_data_.size());
-    cv::Mat myuv(height_ + height_/2, width_, CV_8UC1, &image_data_[0], cv::Mat::AUTO_STEP);
-    image_bgr_ = cv::Mat(cv::Size(width_, height_), CV_8UC3);
-    // printf("[%s] Convert color\n", title_.c_str());
-    cv::cvtColor(myuv, image_bgr_, cv::COLOR_YUV2BGR_I420);
+        // Update frame buffer
+        frame.get_buffer(millicast::VideoType::I420, &image_data_[0]);
+        
+        // Calculate frame FPS
+        std::chrono::duration<float> time_diff = std::chrono::high_resolution_clock::now() - image_tp_;
+        image_tp_ = std::chrono::high_resolution_clock::now();
+        if (frame_fps_ < 10 || frame_fps_ > 40)
+        {
+            // Fast update frame FPS
+            frame_fps_ = 1.0f/time_diff.count();
+        }
+        else {
+            // Moving average frame FPS
+            frame_fps_ = 0.4f*frame_fps_ + 0.6f/time_diff.count();
+        }
+
+        // Copy frame buffer to CV image mat
+        // printf("[%s] Create cv mat: %ld\n", title_.c_str(), image_data_.size());
+        cv::Mat myuv(height_ + height_/2, width_, CV_8UC1, &image_data_[0], cv::Mat::AUTO_STEP);
+        image_bgr_ = cv::Mat(cv::Size(width_, height_), CV_8UC3);
+        // printf("[%s] Convert color\n", title_.c_str());
+        cv::cvtColor(myuv, image_bgr_, cv::COLOR_YUV2BGR_I420);
+    }
+    catch (std::exception &e){
+        std::cerr<<"Error in VideoRenderer::on_frame: "<< e.what() <<std::endl;
+        exit(EXIT_FAILURE);
+    }
 
     mutex_.unlock();
+
+    // Print report
+    time_diff = std::chrono::high_resolution_clock::now() - report_tp_;
+    if (time_diff.count() >= report_dur_)
+    {
+        report_tp_ = std::chrono::high_resolution_clock::now();
+        // 
+        auto time_t_now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
+        printf("[%s] image FPS: %.2f, %d x %d\n", ss.str().c_str(), frame_fps_, width_, height_);
+    }
 }
 
 cv::Mat VideoRenderer::get_image_bgr()
