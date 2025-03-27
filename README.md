@@ -129,3 +129,25 @@ In normal user, after installed pulseaudio, run below command
 ```
 pulseaudio --start
 ```
+
+Note 2: To prevent pulseaudio go to idle mode, add pulseaudio setting:
+```
+loginctl enable-linger username
+```
+
+Copy daemon config to local config
+```
+cp /etc/pulse/daemon.conf ~/.config/pulse/
+```
+
+Change below setting:
+```
+daemonize = yes
+exit-idle-time = -1
+```
+
+Then restart pulseaudio service
+```
+systemctl --user enable pulseaudio
+systemctl --user start pulseaudio
+```
