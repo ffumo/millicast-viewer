@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5.0)
-project(millicast_viewer VERSION 0.1.0 LANGUAGES C CXX)
+
+project(millicast_viewer VERSION 0.1.1 LANGUAGES C CXX)
 
 include(CTest)
 
@@ -28,9 +29,22 @@ option( WITH_METADATA "Enable metadata into frame" OFF )
 
 option( WITH_CV_RENDERER "Render video in a OpenCV" ON )
 
+execute_process(COMMAND echo "${PROJECT_VERSION}" OUTPUT_VARIABLE PROJECT_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+
 # Get current date and time
 execute_process(COMMAND date "+%Y-%m-%d" OUTPUT_VARIABLE BUILD_DATE OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process(COMMAND date "+%H:%M:%S %Z" OUTPUT_VARIABLE BUILD_TIME OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+# Try to print MillicatSDK version if defined
+if(DEFINED MillicastSDK_VERSION)
+    message(STATUS "MillicastSDK version: ${MillicastSDK_VERSION}")
+    execute_process(COMMAND echo "${MillicastSDK_VERSION}" OUTPUT_VARIABLE MILLICAST_SDK_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+elseif(DEFINED MillicastSDK_VERSION_STRING)
+    message(STATUS "MillicastSDK version string: ${MillicastSDK_VERSION_STRING}")
+    execute_process(COMMAND echo "${MillicastSDK_VERSION_STRING}" OUTPUT_VARIABLE MILLICAST_SDK_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+else()
+    message(WARNING "No version information available for MillicastSDK")
+endif()
 
 # Configure the header file
 configure_file(build_info.h.in build_info.h)

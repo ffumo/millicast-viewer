@@ -3,7 +3,8 @@
 #include <string>
 
 namespace build_info {
-    const std::string version = "1.0";
+    const std::string version = "@PROJECT_VERSION@";
+    const std::string millicast_sdk_version = "@MILLICAST_SDK_VERSION@";
     const std::string build_time = "@BUILD_TIME@";
     const std::string build_date = "@BUILD_DATE@";
 }

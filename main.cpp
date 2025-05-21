@@ -275,7 +275,9 @@ void disconnect_event_handlers(
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     argparse::ArgumentParser program("Millicast viewer", 
-    build_info::version + " build time " + build_info::build_date + " " + build_info::build_time);
+    build_info::version +
+    "\nSDK version: " + build_info::millicast_sdk_version + 
+    "\nBuild time " + build_info::build_date + " " + build_info::build_time);
 
     program.add_argument("-c", "--config")
         // .default_value(std::string{"configs/sample_config.json"})
