@@ -295,6 +295,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         // .default_value(true)
         .implicit_value(true);
 
+    program.add_argument("-q", "--quiet")
+        .help("disable showing SDK stats")
+        .default_value(false)
+        // .default_value(true)
+        .implicit_value(true);
+
     try {
         program.parse_args(argc, argv);
     }
@@ -306,10 +312,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     auto config_file = program.get<std::string>("--config");  // "orange"
     auto display = program["--display"] == true;
     auto stream_id = program.get<int>("--id");
+    auto disable_stats = program["--quiet"] == true;
 
     std::cout << "config_file: "<< config_file << std::endl;
     std::cout << "display: "<< display << std::endl;
     std::cout << "stream_id: "<< stream_id << std::endl;
+    std::cout << "disable_stats: "<< disable_stats << std::endl;
 
     nlohmann::json config_;
     try{
@@ -361,8 +369,13 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         std::cout<<"Get stream: "<< stream_config <<std::endl;
         wait(viewer->set_credentials(get_stream_credentials(stream_config["account_id"], stream_config["stream_name"], stream_token)));
 
-        std::cout<<"Enable starts"<<std::endl;
-        wait(viewer->enable_stats(true));
+        if(disable_stats){
+            wait(viewer->enable_stats(false));
+        }
+        else {
+            std::cout<<"Enable starts"<<std::endl;
+            wait(viewer->enable_stats(true));
+        }
 
         // Connect to the millicast backend and then also subscribe to the stream
         millicast::ClientConnectionOptions opts{};
