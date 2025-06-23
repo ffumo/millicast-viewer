@@ -16,6 +16,7 @@ cd ${ROOT_DIR}/build
 source ${SCRIPT_DIR}/source_lib.sh
 cmake  \
     -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu \
     ..
 
 make -j8
