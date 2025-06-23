@@ -401,11 +401,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     } catch (const std::error_condition& cond) {
         millicast::Logger::log("Error occurred " + cond.message(),
                               millicast::LogLevel::MC_ERROR);
-    } 
-    // catch (...) {
-    //     millicast::Logger::log("Unknown error received!",
-    //                           millicast::LogLevel::MC_ERROR);
-    // }
+    } catch (...) {
+        millicast::Logger::log("Unknown error received!",
+                              millicast::LogLevel::MC_ERROR);
+    }
 
     disconnect_event_handlers(viewer_handlers);
     return 0;

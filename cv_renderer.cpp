@@ -35,6 +35,7 @@ VideoRenderer::VideoRenderer(const std::string &title) {
     title_ = title;
     width_ = 0;
     height_ = 0;
+    has_frame_ = false;
     printf("Create new CV video renderer: %s\n", title.c_str());
     image_tp_ = std::chrono::high_resolution_clock::now();
     report_tp_ = std::chrono::high_resolution_clock::now();
@@ -62,6 +63,11 @@ void VideoRenderer::init() {
         if(config_.contains("report_duration"))
         {
             report_dur_ = config_["report_duration"];
+        }
+
+        if(config_.contains("noframe_timeout"))
+        {
+            noframe_timeout_ = config_["noframe_timeout"];
         }
     }
     else{
@@ -106,7 +112,7 @@ void VideoRenderer::on_frame(const millicast::VideoFrame& frame) {
             height_ = frame.height();
             image_data_.resize(width_ * height_ * 3/2);
         }
-
+        has_frame_ = true;
         // Update frame buffer
         frame.get_buffer(millicast::VideoType::I420, &image_data_[0]);
         
@@ -156,6 +162,12 @@ cv::Mat VideoRenderer::get_image_bgr()
     return image_bgr_.clone();
 }
 
+std::chrono::high_resolution_clock::time_point VideoRenderer::get_image_tp()
+{
+    std::lock_guard lock(mutex_);
+    return image_tp_;
+}
+
 bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) {
     if (render->display_){
         // printf("[%s] Run iteration data size: %ld\n", render->title_.c_str(), render->image_data_.size());
@@ -181,6 +193,17 @@ bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) 
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     
+    if (render->has_frame_) {
+        auto _image_tp = render->get_image_tp();
+        std::chrono::duration<float> time_diff = std::chrono::high_resolution_clock::now() - _image_tp;
+        // If noframe_timeout_ is set, then check timeout
+        if ((render->noframe_timeout_ > 0.5f) && (time_diff.count() > render->noframe_timeout_)) {
+            // throw std::runtime_error("Error no frame after: " + std::to_string(time_diff.count()));
+            printf("Error no frame after: %f\n", time_diff.count());
+            // Return false to cancel TrackManager in render loop
+            return false;
+        }
+    }
     render->public_image();
     return true;
 }

@@ -36,8 +36,11 @@ class VideoRenderer : public millicast::VideoRenderer {
 
     float frame_fps_;
 
+    bool has_frame_ = false;
     // Report duration is 5s
     float report_dur_ = 5.0f;
+    // No Frame Timeout is 5s, after then exit viewer. Set 0 to disable
+    float noframe_timeout_ = 5.0f;
 
 public:
     std::string title_;
@@ -59,6 +62,7 @@ public:
 
     // utilities methods
     cv::Mat get_image_bgr();
+    std::chrono::high_resolution_clock::time_point get_image_tp();
     void public_image();
 
     void destroy();
