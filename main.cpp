@@ -68,11 +68,19 @@ public:
         {
             std::unique_lock lock(mutex_);
             if (tracks_to_render_.empty()) {
-                cv_.wait(lock, [this]() { return !tracks_to_render_.empty(); });
+                std::cout<<"Wait for getting track\n";
+                // cv_.wait(lock, [this]() { return !tracks_to_render_.empty(); });
+                // Set timeout 7 seconds for waiting 
+                if(!cv_.wait_for(lock, std::chrono::seconds(5), [this]() { return !tracks_to_render_.empty(); }))
+                {
+                    throw std::runtime_error("start_render_loop timeout after 7 seconds");
+                }
+                std::cout<<"Get track success\n";
             }
         }
         do {
             std::lock_guard lock(mutex_);
+            std::cout<<"start_render_loop\n";
             if (!tracks_to_render_.empty()) {
                 auto* track = tracks_to_render_.front();
                 tracks_to_render_.pop_front();
@@ -400,6 +408,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         wait(viewer->disconnect());
     } catch (const std::error_condition& cond) {
         millicast::Logger::log("Error occurred " + cond.message(),
+                              millicast::LogLevel::MC_ERROR);
+    } catch (const std::runtime_error & cond) {
+        millicast::Logger::log("Runtime error occurred " + std::string(cond.what()),
                               millicast::LogLevel::MC_ERROR);
     } catch (...) {
         millicast::Logger::log("Unknown error received!",

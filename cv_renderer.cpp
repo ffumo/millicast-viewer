@@ -39,6 +39,7 @@ VideoRenderer::VideoRenderer(const std::string &title) {
     printf("Create new CV video renderer: %s\n", title.c_str());
     image_tp_ = std::chrono::high_resolution_clock::now();
     report_tp_ = std::chrono::high_resolution_clock::now();
+    viewer_start_tp_ = std::chrono::high_resolution_clock::now();
 }
 
 VideoRenderer::~VideoRenderer() {
@@ -68,6 +69,11 @@ void VideoRenderer::init() {
         if(config_.contains("noframe_timeout"))
         {
             noframe_timeout_ = config_["noframe_timeout"];
+        }
+
+        if(config_.contains("viewer_start_timeout"))
+        {
+            viewer_start_timeout_ = config_["viewer_start_timeout"];
         }
     }
     else{
@@ -112,6 +118,7 @@ void VideoRenderer::on_frame(const millicast::VideoFrame& frame) {
             height_ = frame.height();
             image_data_.resize(width_ * height_ * 3/2);
         }
+        if(!has_frame_) printf("Got first frame ****** \n");
         has_frame_ = true;
         // Update frame buffer
         frame.get_buffer(millicast::VideoType::I420, &image_data_[0]);
@@ -199,7 +206,16 @@ bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) 
         // If noframe_timeout_ is set, then check timeout
         if ((render->noframe_timeout_ > 0.5f) && (time_diff.count() > render->noframe_timeout_)) {
             // throw std::runtime_error("Error no frame after: " + std::to_string(time_diff.count()));
-            printf("Error no frame after: %f\n", time_diff.count());
+            printf("Error no frame after: %f seconds\n", time_diff.count());
+            // Return false to cancel TrackManager in render loop
+            return false;
+        }
+    }
+    else {
+        std::chrono::duration<float> time_diff = std::chrono::high_resolution_clock::now() - render->viewer_start_tp_;
+        if ((render->viewer_start_timeout_ > 0.5f) && (time_diff.count() > render->viewer_start_timeout_)) {
+            // throw std::runtime_error("Error no frame after: " + std::to_string(time_diff.count()));
+            printf("Error no frame after: %f seconds\n", time_diff.count());
             // Return false to cancel TrackManager in render loop
             return false;
         }

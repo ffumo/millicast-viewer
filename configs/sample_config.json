@@ -17,6 +17,9 @@
         "address": "tcp://localhost:50553",
         "topic": ""
       },
+      "report_duration": 2.0,
+      "noframe_timeout": 3.0,
+      "viewer_start_timeout": 5.0,
 
       "log_dir": "logs/g1sb",
       "roi_": {

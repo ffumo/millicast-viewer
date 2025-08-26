@@ -36,11 +36,16 @@ class VideoRenderer : public millicast::VideoRenderer {
 
     float frame_fps_;
 
+    // Timestamp at begining of app
+    std::chrono::high_resolution_clock::time_point viewer_start_tp_;
+    // Flag is set when the first frame had arrived
     bool has_frame_ = false;
     // Report duration is 5s
     float report_dur_ = 5.0f;
     // No Frame Timeout is 5s, after then exit viewer. Set 0 to disable
     float noframe_timeout_ = 5.0f;
+    // Starting app timeout, if has no frame after timeout, then exit viewer. Set 0 to disable
+    float viewer_start_timeout_ = 5.0f;
 
 public:
     std::string title_;

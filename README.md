@@ -17,6 +17,17 @@ Utility for capturing Millicast stream
     git clone https://github.com/ffumo/millicast-viewer.git
     ```
 
+- Install Ubuntu package:
+```
+sudo apt install -y libx11-dev libxfixes-dev libxdamage-dev libxcomposite-dev libxtst-dev \
+  libxrandr-dev libavahi-client3 libavahi-common3
+```
+
+```
+sudo apt install -y unzip
+```
+
+
 - Download thirdparty libraries<br/>
     
     Please consider your system architecture (Darwin or Linux)
@@ -112,6 +123,8 @@ App available options:
 -  -c, --config: configuration file [required]
 -  --id :stream id in configuration file [nargs=0..1] [default: 1]
 -  -d, --display: enable display 
+-  -q, --quiet: disable printing star logging 
+
 
 Configuration file contains stream information. Please refer to [sample_config.json](config/sample_config.json)
 
