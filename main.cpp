@@ -80,7 +80,6 @@ public:
         }
         do {
             std::lock_guard lock(mutex_);
-            std::cout<<"start_render_loop\n";
             if (!tracks_to_render_.empty()) {
                 auto* track = tracks_to_render_.front();
                 tracks_to_render_.pop_front();
