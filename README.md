@@ -37,18 +37,22 @@ sudo apt install -y unzip
 
     - [Millicast SDK](https://github.com/millicast/millicast-native-sdk/releases) for stream subscription [MacOs Arm64]
         ```shell
-        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.4.3/millicast-native-sdk-2.4.3-macos-arm64.zip -O 3rd/millicast.zip
+        <!-- wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.4.3/millicast-native-sdk-2.4.3-macos-arm64.zip -O 3rd/millicast.zip -->
+        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.1/millicast-native-sdk-2.5.1-macos-arm64.zip -O 3rd/millicast.zip
 
         unzip 3rd/millicast.zip -d 3rd && mv 3rd/usr lib/millicast
         ```
 
     - [Millicast SDK](https://github.com/millicast/millicast-native-sdk/releases) for stream subscription [Ubuntu 22.04 x86] (Ignore this step if you installed millicast via **apt**)
         ```shell
-        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.4.3/millicast-native-sdk-2.4.3-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
+        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.1/millicast-native-sdk-2.5.1-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
 
         ar vx 3rd/millicast.deb --output 3rd/
 
         tar -xvf 3rd/data.tar.gz --directory 3rd/ && mv 3rd/usr lib/millicast
+        ```
+        ```shell
+        ln -rs lib/millicast/libexec/millicastsdk/libndi.so.5.1.1 lib/millicast/libexec/millicastsdk/libndi.so.5
         ```
 
     - [OpenCV](https://docs.opencv.org/4.x/d7/d9f/tutorial_linux_install.html) for image processing
