@@ -44,13 +44,21 @@ sudo apt install -y unzip
         ```
 
     - [Millicast SDK](https://github.com/millicast/millicast-native-sdk/releases) for stream subscription [Ubuntu 22.04 x86] (Ignore this step if you installed millicast via **apt**)
+        
+        - Remove old MillicastSDK lib
         ```shell
+        rm -rf 3rd/millicast.deb 3rd/debian-binary 3rd/control.tar.gz 3rd/data.tar.gz lib/millicast
+        ```
+        - Download latest version of SDK
+        ```
         wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.1/millicast-native-sdk-2.5.1-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
 
         ar vx 3rd/millicast.deb --output 3rd/
 
         tar -xvf 3rd/data.tar.gz --directory 3rd/ && mv 3rd/usr lib/millicast
         ```
+
+        - Create static link to dependency
         ```shell
         ln -rs lib/millicast/libexec/millicastsdk/libndi.so.5.1.1 lib/millicast/libexec/millicastsdk/libndi.so.5
         ```
