@@ -281,10 +281,10 @@ void disconnect_event_handlers(
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
-    argparse::ArgumentParser program("Millicast viewer", 
-    build_info::version +
-    "\nSDK version: " + build_info::millicast_sdk_version + 
-    "\nBuild time " + build_info::build_date + " " + build_info::build_time);
+    std::string version = build_info::version +
+                            "\nSDK version: " + build_info::millicast_sdk_version + 
+                            "\nBuild time " + build_info::build_date + " " + build_info::build_time;
+    argparse::ArgumentParser program("Millicast viewer", version);
 
     program.add_argument("-c", "--config")
         // .default_value(std::string{"configs/sample_config.json"})
@@ -321,6 +321,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     auto stream_id = program.get<int>("--id");
     auto disable_stats = program["--quiet"] == true;
 
+    std::cout << "Version: "<< version << std::endl;
     std::cout << "config_file: "<< config_file << std::endl;
     std::cout << "display: "<< display << std::endl;
     std::cout << "stream_id: "<< stream_id << std::endl;

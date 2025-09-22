@@ -36,9 +36,14 @@ sudo apt install -y unzip
     ```
 
     - [Millicast SDK](https://github.com/millicast/millicast-native-sdk/releases) for stream subscription [MacOs Arm64]
+
+        - Remove old MillicastSDK lib
         ```shell
-        <!-- wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.4.3/millicast-native-sdk-2.4.3-macos-arm64.zip -O 3rd/millicast.zip -->
-        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.1/millicast-native-sdk-2.5.1-macos-arm64.zip -O 3rd/millicast.zip
+        rm -rf 3rd/millicast.zip lib/millicast
+        ```
+
+        ```shell
+        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.2/millicast-native-sdk-2.5.2-macos-arm64.zip -O 3rd/millicast.zip
 
         unzip 3rd/millicast.zip -d 3rd && mv 3rd/usr lib/millicast
         ```
@@ -51,7 +56,7 @@ sudo apt install -y unzip
         ```
         - Download latest version of SDK
         ```
-        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.1/millicast-native-sdk-2.5.1-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
+        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.2/millicast-native-sdk-2.5.2-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
 
         ar vx 3rd/millicast.deb --output 3rd/
 
