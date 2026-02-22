@@ -31,11 +31,12 @@ std::string GetStringCurrentTime(std::chrono::system_clock::time_point tp) {
     return ss.str();
 }
 
-VideoRenderer::VideoRenderer(const std::string &title) {
+VideoRenderer::VideoRenderer(const std::string &title, zmq::context_t * zmq_ctx) {
     title_ = title;
     width_ = 0;
     height_ = 0;
     has_frame_ = false;
+    zmq_ctx_p_ = zmq_ctx;
     printf("Create new CV video renderer: %s\n", title.c_str());
     image_tp_ = std::chrono::high_resolution_clock::now();
     report_tp_ = std::chrono::high_resolution_clock::now();
@@ -51,7 +52,7 @@ bool VideoRenderer::set_window_size(int w, int h) {
 }
 
 void VideoRenderer::init() {
-    zmq_sock_p_ = std::make_shared<zmq::socket_t>(zmq_ctx_, zmq::socket_type::pub);
+    zmq_sock_p_ = std::make_shared<zmq::socket_t>(*zmq_ctx_p_, zmq::socket_type::pub);
     if(!config_.empty()){
         zmq_address_ = config_["zmq"]["address"];
         if(config_["zmq"].contains("topic")){
@@ -81,6 +82,14 @@ void VideoRenderer::init() {
         zmq_topic_ = "";
     }
     printf("Create ZMQ at: %s\n", zmq_address_.c_str());
+    
+    int sndhwm = 300;
+    zmq_sock_p_->setsockopt(ZMQ_SNDHWM, &sndhwm, sizeof(sndhwm));
+    int conflate = 1;
+    zmq_sock_p_->setsockopt(ZMQ_CONFLATE, &conflate, sizeof(conflate));
+    int linger = 0;
+    zmq_sock_p_->setsockopt(ZMQ_LINGER, &linger, sizeof(linger));
+
     zmq_sock_p_->bind(zmq_address_.c_str());
 
     // Set sending timepoint after image timepoint, avoid send empty image

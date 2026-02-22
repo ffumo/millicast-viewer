@@ -10,6 +10,7 @@
 #include <thread>
 #include <chrono>
 #include <stdio.h>
+#include <zmq.hpp>
 
 #include <millicast-sdk/mc_logging.h>
 #include <millicast-sdk/renderer.h>
@@ -63,7 +64,7 @@ class TrackManager {
 
 public:
     TrackManager() = default;
-    void start_render_loop(std::string config_file, int stream_id=1, bool display=false) {
+    void start_render_loop(zmq::context_t * zmq_ctx, std::string config_file, int stream_id=1, bool display=false) {
         // wait for the first track to come before running the render loop
         {
             std::unique_lock lock(mutex_);
@@ -83,16 +84,16 @@ public:
             if (!tracks_to_render_.empty()) {
                 auto* track = tracks_to_render_.front();
                 tracks_to_render_.pop_front();
-                track->enable(add_renderer(config_file, stream_id, display));
+                track->enable(add_renderer(zmq_ctx, config_file, stream_id, display));
                 printf("Added render: %ld\n", renderers_.size());
             }
         } while (VideoRenderer::run_iteration(renderers_.back()));
     }
 
-    const std::shared_ptr<VideoRenderer>& add_renderer(std::string config_file, int stream_id=1, bool display=false) {
+    const std::shared_ptr<VideoRenderer>& add_renderer(zmq::context_t * zmq_ctx, std::string config_file, int stream_id=1, bool display=false) {
         std::string render_name = "Track " + std::to_string((int)renderers_.size());
         printf("Create render: %s\n", render_name.c_str());
-        std::shared_ptr<VideoRenderer> render = std::make_shared<VideoRenderer>(render_name);
+        std::shared_ptr<VideoRenderer> render = std::make_shared<VideoRenderer>(render_name, zmq_ctx);
         render->display_ = display;
         renderers_.push_back(render);
         renderers_.back()->init(config_file, stream_id);
@@ -359,6 +360,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         std::move(components));
 
     std::vector<millicast::EventConnectionPtr> viewer_handlers;
+
+    zmq::context_t zmq_ctx{1};   // ONE per process
     try {
         // Creates the viewer, this is synchronous
         auto viewer = millicast::Viewer::create();
@@ -401,7 +404,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 
         std::cout<<"Start render loop"<<std::endl;
         // Wait for any character to exit
-        track_manager->start_render_loop(config_file, stream_id, display);
+        track_manager->start_render_loop(&zmq_ctx, config_file, stream_id, display);
 
         // Unsubscribe and disconnect
         wait(viewer->unsubscribe());

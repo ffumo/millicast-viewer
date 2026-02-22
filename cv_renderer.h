@@ -21,10 +21,12 @@ class VideoRenderer : public millicast::VideoRenderer {
 
     std::mutex mutex_;
 
-    zmq::context_t zmq_ctx_;
+    // zmq::context_t zmq_ctx_;
+    zmq::context_t * zmq_ctx_p_;
     std::string zmq_address_;
     std::string zmq_topic_;
     std::shared_ptr<zmq::socket_t> zmq_sock_p_;
+    // zmq::socket_t * zmq_sock_p_;
     nlohmann::json config_;
 
     int width_;
@@ -51,7 +53,7 @@ public:
     std::string title_;
     std::atomic_bool display_ = {false};
 
-    VideoRenderer(const std::string &title);
+    VideoRenderer(const std::string &title, zmq::context_t * zmq_ctx);
     ~VideoRenderer();
 
     void init() override;
