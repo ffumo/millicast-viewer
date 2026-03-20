@@ -39,6 +39,7 @@ VideoRenderer::VideoRenderer(const std::string &title) {
     printf("Create new CV video renderer: %s\n", title.c_str());
     image_tp_ = std::chrono::high_resolution_clock::now();
     report_tp_ = std::chrono::high_resolution_clock::now();
+    sampling_tp_ = std::chrono::high_resolution_clock::now();
     viewer_start_tp_ = std::chrono::high_resolution_clock::now();
 }
 
@@ -200,9 +201,29 @@ bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) 
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     
+    std::chrono::duration<float> time_diff;
+    // Sampling image
+    time_diff = std::chrono::high_resolution_clock::now() - render->sampling_tp_;
+    if (render->sampling_mode_ && (time_diff.count() >= render->sampling_dur_))
+    {
+        render->sampling_tp_ = std::chrono::high_resolution_clock::now();
+        // 
+        cv::Mat img = render->get_image_bgr();
+        if (!img.empty()) {
+            std::string img_name = "sample.jpg";
+            cv::imwrite(img_name, img);
+                
+            auto time_t_now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+            std::stringstream ss;
+            ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
+            printf("[%s] Saved sample image: %s - %d x %d\n", ss.str().c_str(), img_name.c_str(), img.rows, img.cols);
+        }
+
+    }
+
     if (render->has_frame_) {
         auto _image_tp = render->get_image_tp();
-        std::chrono::duration<float> time_diff = std::chrono::high_resolution_clock::now() - _image_tp;
+        time_diff = std::chrono::high_resolution_clock::now() - _image_tp;
         // If noframe_timeout_ is set, then check timeout
         if ((render->noframe_timeout_ > 0.5f) && (time_diff.count() > render->noframe_timeout_)) {
             // throw std::runtime_error("Error no frame after: " + std::to_string(time_diff.count()));
@@ -212,7 +233,7 @@ bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) 
         }
     }
     else {
-        std::chrono::duration<float> time_diff = std::chrono::high_resolution_clock::now() - render->viewer_start_tp_;
+        time_diff = std::chrono::high_resolution_clock::now() - render->viewer_start_tp_;
         if ((render->viewer_start_timeout_ > 0.5f) && (time_diff.count() > render->viewer_start_timeout_)) {
             // throw std::runtime_error("Error no frame after: " + std::to_string(time_diff.count()));
             printf("Error no frame after: %f seconds\n", time_diff.count());

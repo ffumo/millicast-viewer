@@ -63,7 +63,7 @@ class TrackManager {
 
 public:
     TrackManager() = default;
-    void start_render_loop(std::string config_file, int stream_id=1, bool display=false) {
+    void start_render_loop(std::string config_file, int stream_id=1, bool display=false, bool sampling_mode=false) {
         // wait for the first track to come before running the render loop
         {
             std::unique_lock lock(mutex_);
@@ -83,17 +83,18 @@ public:
             if (!tracks_to_render_.empty()) {
                 auto* track = tracks_to_render_.front();
                 tracks_to_render_.pop_front();
-                track->enable(add_renderer(config_file, stream_id, display));
+                track->enable(add_renderer(config_file, stream_id, display, sampling_mode));
                 printf("Added render: %ld\n", renderers_.size());
             }
         } while (VideoRenderer::run_iteration(renderers_.back()));
     }
 
-    const std::shared_ptr<VideoRenderer>& add_renderer(std::string config_file, int stream_id=1, bool display=false) {
+    const std::shared_ptr<VideoRenderer>& add_renderer(std::string config_file, int stream_id=1, bool display=false, bool sampling_mode=false) {
         std::string render_name = "Track " + std::to_string((int)renderers_.size());
         printf("Create render: %s\n", render_name.c_str());
         std::shared_ptr<VideoRenderer> render = std::make_shared<VideoRenderer>(render_name);
         render->display_ = display;
+        render->sampling_mode_ = sampling_mode;
         renderers_.push_back(render);
         renderers_.back()->init(config_file, stream_id);
         printf("Created render: %s\n", render->title_.c_str());
@@ -308,6 +309,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         // .default_value(true)
         .implicit_value(true);
 
+    program.add_argument("-s", "--sample")
+        .help("enable sampling mode")
+        .default_value(false)
+        .implicit_value(true);
+
     try {
         program.parse_args(argc, argv);
     }
@@ -320,12 +326,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
     auto display = program["--display"] == true;
     auto stream_id = program.get<int>("--id");
     auto disable_stats = program["--quiet"] == true;
+    auto sampling_mode = program["--sample"] == true;
 
     std::cout << "Version: "<< version << std::endl;
     std::cout << "config_file: "<< config_file << std::endl;
     std::cout << "display: "<< display << std::endl;
     std::cout << "stream_id: "<< stream_id << std::endl;
     std::cout << "disable_stats: "<< disable_stats << std::endl;
+    std::cout << "sampling mode: "<< sampling_mode << std::endl;
 
     nlohmann::json config_;
     try{
@@ -401,7 +409,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 
         std::cout<<"Start render loop"<<std::endl;
         // Wait for any character to exit
-        track_manager->start_render_loop(config_file, stream_id, display);
+        track_manager->start_render_loop(config_file, stream_id, display, sampling_mode);
 
         // Unsubscribe and disconnect
         wait(viewer->unsubscribe());

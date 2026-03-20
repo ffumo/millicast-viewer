@@ -42,6 +42,7 @@ class VideoRenderer : public millicast::VideoRenderer {
     bool has_frame_ = false;
     // Report duration is 5s
     float report_dur_ = 5.0f;
+    float sampling_dur_ = 3.0f;
     // No Frame Timeout is 5s, after then exit viewer. Set 0 to disable
     float noframe_timeout_ = 5.0f;
     // Starting app timeout, if has no frame after timeout, then exit viewer. Set 0 to disable
@@ -50,6 +51,8 @@ class VideoRenderer : public millicast::VideoRenderer {
 public:
     std::string title_;
     std::atomic_bool display_ = {false};
+    std::atomic_bool sampling_mode_ = {false};
+    std::chrono::high_resolution_clock::time_point sampling_tp_;
 
     VideoRenderer(const std::string &title);
     ~VideoRenderer();
