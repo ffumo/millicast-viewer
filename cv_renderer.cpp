@@ -160,7 +160,7 @@ void VideoRenderer::on_frame(const millicast::VideoFrame& frame) {
         auto time_t_now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         std::stringstream ss;
         ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
-        printf("[%s] image FPS: %.2f, %d x %d\n", ss.str().c_str(), frame_fps_, width_, height_);
+        printf("[%s] image FPS: %.2f, WH: %d x %d\n", ss.str().c_str(), frame_fps_, width_, height_);
     }
 }
 
@@ -216,7 +216,7 @@ bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) 
             auto time_t_now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
             std::stringstream ss;
             ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
-            printf("[%s] Saved sample image: %s - %d x %d\n", ss.str().c_str(), img_name.c_str(), img.rows, img.cols);
+            printf("[%s] Saved sample image: %s - HW: %d x %d\n", ss.str().c_str(), img_name.c_str(), img.rows, img.cols);
         }
 
     }
