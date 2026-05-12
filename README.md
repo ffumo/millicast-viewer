@@ -18,6 +18,11 @@ Utility for capturing Millicast stream
     ```
 
 - Install Ubuntu package:
+
+```
+sudo apt install build-essential yasm cmake libx264-dev libx265-dev libvpx-dev libfdk-aac-dev libopus-dev
+```
+
 ```
 sudo apt install -y libx11-dev libxfixes-dev libxdamage-dev libxcomposite-dev libxtst-dev \
   libxrandr-dev libavahi-client3 libavahi-common3
@@ -43,7 +48,7 @@ sudo apt install -y unzip
         ```
 
         ```shell
-        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.2/millicast-native-sdk-2.5.2-macos-arm64.zip -O 3rd/millicast.zip
+        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.4/millicast-native-sdk-2.5.4-macos-arm64.zip -O 3rd/millicast.zip
 
         unzip 3rd/millicast.zip -d 3rd && mv 3rd/usr lib/millicast
         ```
@@ -67,6 +72,20 @@ sudo apt install -y unzip
         ```shell
         ln -rs lib/millicast/libexec/millicastsdk/libndi.so.5.1.1 lib/millicast/libexec/millicastsdk/libndi.so.5
         ```
+
+    - [FFmpeg] (https://ffmpeg.org/) for RTMP stream subscription 
+        - Remove old FFMPEG lib
+        ```shell
+        rm -rf 3rd/ffmpeg lib/ffmpeg
+        ```
+        - Download latest version of SDK
+        ```
+        wget https://ffmpeg.org/releases/ffmpeg-8.1.1.tar.xz -O 3rd/ffmpeg-8.1.1.tar.xz
+        ```
+        ```
+        tar -xvf 3rd/ffmpeg-8.1.1.tar.xz --directory 3rd/ && mv 3rd/ffmpeg-8.1.1 3rd/ffmpeg
+        ```
+
 
     - [OpenCV](https://docs.opencv.org/4.x/d7/d9f/tutorial_linux_install.html) for image processing
         ```shell

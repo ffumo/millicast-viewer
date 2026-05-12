@@ -1,10 +1,15 @@
-#pragma once
+#ifndef __BUILD_INFO_H__
+#define __BUILD_INFO_H__
 
 #include <string>
 
 namespace build_info {
     const std::string version = "@PROJECT_VERSION@";
     const std::string millicast_sdk_version = "@MILLICAST_SDK_VERSION@";
+    const std::string ffmpeg_version = "@FFMPEG_VERSION@";
+    const std::string opencv_version = "@OPENCV_VERSION@";
     const std::string build_time = "@BUILD_TIME@";
     const std::string build_date = "@BUILD_DATE@";
 }
+
+#endif

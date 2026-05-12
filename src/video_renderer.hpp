@@ -1,7 +1,5 @@
-#ifndef CV_RENDERER_H
-#define CV_RENDERER_H
-
-#include <millicast-sdk/renderer.h>
+#ifndef __VIDEO_RENDERER__
+#define __VIDEO_RENDERER__
 
 #include <memory>
 #include <atomic>
@@ -12,11 +10,15 @@
 #include <chrono>
 
 
+namespace videostream {
 
-class VideoRenderer : public millicast::VideoRenderer {
+class VideoRenderer {
+
+public:
     // std::unique_ptr<uint8_t[]> image;
     // std::unique_ptr<uchar[]> _image;
-    std::vector<uchar> image_data_;
+    // std::vector<uchar> image_data_;
+
     cv::Mat image_bgr_;
 
     std::mutex mutex_;
@@ -42,22 +44,19 @@ class VideoRenderer : public millicast::VideoRenderer {
     bool has_frame_ = false;
     // Report duration is 5s
     float report_dur_ = 5.0f;
-    float sampling_dur_ = 3.0f;
     // No Frame Timeout is 5s, after then exit viewer. Set 0 to disable
     float noframe_timeout_ = 5.0f;
     // Starting app timeout, if has no frame after timeout, then exit viewer. Set 0 to disable
     float viewer_start_timeout_ = 5.0f;
 
-public:
+// public:
     std::string title_;
     std::atomic_bool display_ = {false};
-    std::atomic_bool sampling_mode_ = {false};
-    std::chrono::high_resolution_clock::time_point sampling_tp_;
 
     VideoRenderer(const std::string &title);
     ~VideoRenderer();
 
-    void init() override;
+    // void init();
 
     /*
     Init renderer with configuration file
@@ -65,7 +64,7 @@ public:
     @param stream_id Stream id. Default: 1
     */
     void init(const std::string &config_file, int stream_id=1);
-    void on_frame(const millicast::VideoFrame& frame) override;
+    // void on_frame(const millicast::VideoFrame& frame) override;
     static bool run_iteration(const std::shared_ptr<VideoRenderer>& render);
 
     // utilities methods
@@ -80,4 +79,6 @@ public:
     bool set_window_size(int w, int h);
 };
 
-#endif /* LINUX_RENDERER_H */
+}
+
+#endif /* __VIDEO_RENDERER__ */

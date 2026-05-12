@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.10.0)
 
-project(millicast_viewer VERSION 0.2.4 LANGUAGES C CXX)
+project(millicast_viewer VERSION 0.3.0 LANGUAGES C CXX)
 
 include(CTest)
 
@@ -8,6 +8,9 @@ include(CTest)
 
 enable_testing()
 
+option( WITH_METADATA "Enable metadata into frame" OFF )
+
+################ Millicast ####################
 set(MillicastLIB_DIR "${PROJECT_SOURCE_DIR}/lib/millicast")
 set(CommonSRC_DIR "${MillicastLIB_DIR}/share/millicastsdk/examples/common")
 
@@ -23,11 +26,7 @@ endif()
 
 find_package(MillicastSDK REQUIRED)
 
-option( WITH_METADATA "Enable metadata into frame" OFF )
-
 ## For subscriber
-
-option( WITH_CV_RENDERER "Render video in a OpenCV" ON )
 
 execute_process(COMMAND echo "${PROJECT_VERSION}" OUTPUT_VARIABLE PROJECT_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
 
@@ -45,6 +44,49 @@ elseif(DEFINED MillicastSDK_VERSION_STRING)
 else()
     message(WARNING "No version information available for MillicastSDK")
 endif()
+###############################################
+
+
+################### FFMPEG ####################
+# 1. Define your local path
+set(FFMPEG_ROOT "${PROJECT_SOURCE_DIR}/lib/ffmpeg")
+
+# 2. Set Include Directories
+# Assuming headers are in ../lib/ffmpeg/include
+set(FFMPEG_INCLUDE_DIRS "${FFMPEG_ROOT}/include")
+
+# 3. Set Library Paths manually
+# This handles the specific .dylib (macOS) or .so files in your local folder
+
+find_library(AVFORMAT_LIB avformat PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+find_library(AVCODEC_LIB  avcodec  PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+find_library(AVUTIL_LIB   avutil   PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+find_library(SWSCALE_LIB  swscale  PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+
+# Path to the version header in your local build
+set(VERSION_HEADER "${FFMPEG_ROOT}/include/libavutil/ffversion.h")
+
+if(EXISTS "${VERSION_HEADER}")
+    file(STRINGS "${VERSION_HEADER}" FFMPEG_VERSION_LINE REGEX "#define FFMPEG_VERSION")
+    string(REGEX MATCH "\"(.*)\"" FFMPEG_VERSION "${FFMPEG_VERSION_LINE}")
+    set(FFMPEG_VERSION ${CMAKE_MATCH_1})
+    message(STATUS "Manual Parse - FFmpeg Version: ${FFMPEG_VERSION}")
+    execute_process(COMMAND echo "${FFMPEG_VERSION}" OUTPUT_VARIABLE FFMPEG_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
+
+# message(STATUS "Detected FFmpeg (libavcodec) version: ${AVCODEC_VERSION}")
+
+set(FFMPEG_LIBRARIES ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB})
+#################################################
+
+
+
+find_package( OpenCV REQUIRED HINTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/opencv/lib/cmake")
+message(STATUS "OpenCV version: ${OpenCV_VERSION}")
+execute_process(COMMAND echo "${OpenCV_VERSION}" OUTPUT_VARIABLE OPENCV_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+find_package( ZeroMQ QUIET HINTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/zeromq/lib/cmake")
+find_package( cppzmq REQUIRED HINTS "${PROJECT_SOURCE_DIR}/lib/cppzmq")
 
 # Configure the header file
 configure_file(build_info.h.in build_info.h)
@@ -52,43 +94,38 @@ configure_file(build_info.h.in build_info.h)
 # Include the generated header directory
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
+
 add_executable(millicast_viewer
-    main.cpp
+    millicast_viewer.cpp
+    ${PROJECT_SOURCE_DIR}/src/millicast_renderer.cpp
+    ${PROJECT_SOURCE_DIR}/src/millicast_renderer.hpp
+    ${PROJECT_SOURCE_DIR}/src/video_renderer.cpp
+    ${PROJECT_SOURCE_DIR}/src/video_renderer.hpp
     ${CommonSRC_DIR}/utils.cpp
     ${CommonSRC_DIR}/utils.h
     ${PROJECT_SOURCE_DIR}/3rd/json/nlohmann/json.hpp
     ${PROJECT_SOURCE_DIR}/3rd/argparse/argparse.hpp
 )
 
-if( WITH_CV_RENDERER )
-    target_compile_definitions( millicast_viewer PRIVATE WITH_CV_RENDERER )
-    find_package( OpenCV REQUIRED HINTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/opencv/lib/cmake")
-    find_package( ZeroMQ QUIET HINTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/zeromq/lib/cmake")
-    find_package( cppzmq REQUIRED HINTS "${PROJECT_SOURCE_DIR}/lib/cppzmq")
-    target_sources(millicast_viewer PRIVATE
-        cv_renderer.cpp
-        cv_renderer.h
-    )
-
-    target_include_directories (millicast_viewer PUBLIC 
-        ${OpenCV_INCLUDE_DIRS}
-        ${cppzmq_INCLUDE_DIR}
-        ${ZeroMQ_INCLUDE_DIR}
-        )
-
-    target_link_libraries( millicast_viewer PUBLIC 
-        ${OpenCV_LIBS} 
-        ${ZeroMQ_LIBRARY})
-endif()
 
 target_include_directories (millicast_viewer PUBLIC 
+    ${OpenCV_INCLUDE_DIRS}
+    ${cppzmq_INCLUDE_DIR}
+    ${ZeroMQ_INCLUDE_DIR}
     ${CommonSRC_DIR}
     ${PROJECT_SOURCE_DIR}/3rd/json/
     ${PROJECT_SOURCE_DIR}/3rd/argparse/
-    )
+)
 
-target_link_libraries( millicast_viewer PUBLIC Millicast::MillicastSDK )
+target_link_libraries( millicast_viewer PUBLIC 
+    ${OpenCV_LIBS} 
+    ${ZeroMQ_LIBRARY}
+    Millicast::MillicastSDK
+)
+
+
 set_target_properties( millicast_viewer PROPERTIES CXX_STANDARD 17 )
+
 if( WITH_METADATA )
   #target_compile_definitions( millicast_viewer PRIVATE WITH_METADATA )
   target_compile_definitions( millicast_viewer PRIVATE WITH_METADATA )
@@ -117,3 +154,68 @@ endif()
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
 include(CPack)
+
+
+# # 1. Define your local path
+# set(FFMPEG_ROOT "${PROJECT_SOURCE_DIR}/lib/ffmpeg")
+
+# # 2. Set Include Directories
+# # Assuming headers are in ../lib/ffmpeg/include
+# set(FFMPEG_INCLUDE_DIRS "${FFMPEG_ROOT}/include")
+
+# # 3. Set Library Paths manually
+# # This handles the specific .dylib (macOS) or .so files in your local folder
+
+# find_library(AVFORMAT_LIB avformat PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+# find_library(AVCODEC_LIB  avcodec  PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+# find_library(AVUTIL_LIB   avutil   PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+# find_library(SWSCALE_LIB  swscale  PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+
+# # Path to the version header in your local build
+# set(VERSION_HEADER "${FFMPEG_ROOT}/include/libavutil/ffversion.h")
+
+# if(EXISTS "${VERSION_HEADER}")
+#     file(STRINGS "${VERSION_HEADER}" FFMPEG_VERSION_LINE REGEX "#define FFMPEG_VERSION")
+#     string(REGEX MATCH "\"(.*)\"" FFMPEG_VERSION "${FFMPEG_VERSION_LINE}")
+#     set(FFMPEG_VERSION ${CMAKE_MATCH_1})
+#     message(STATUS "Manual Parse - FFmpeg Version: ${FFMPEG_VERSION}")
+#     execute_process(COMMAND echo "${FFMPEG_VERSION}" OUTPUT_VARIABLE FFMPEG_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
+# endif()
+
+# # message(STATUS "Detected FFmpeg (libavcodec) version: ${AVCODEC_VERSION}")
+
+# set(FFMPEG_LIBRARIES ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB})
+
+# 4. Find OpenCV (standard way)
+# find_package(OpenCV REQUIRED)
+
+# 5. Build
+add_executable(ffmpeg_viewer 
+    ffmpeg_viewer.cpp
+    ${PROJECT_SOURCE_DIR}/src/ffmpeg_renderer.cpp
+    ${PROJECT_SOURCE_DIR}/src/ffmpeg_renderer.hpp
+    ${PROJECT_SOURCE_DIR}/src/video_renderer.cpp
+    ${PROJECT_SOURCE_DIR}/src/video_renderer.hpp
+    ${PROJECT_SOURCE_DIR}/3rd/json/nlohmann/json.hpp
+    ${PROJECT_SOURCE_DIR}/3rd/argparse/argparse.hpp
+    ${PROJECT_SOURCE_DIR}/src/program_info.hpp
+    ${PROJECT_SOURCE_DIR}/src/program_info.cpp
+)
+set_target_properties( ffmpeg_viewer PROPERTIES CXX_STANDARD 17 )
+
+target_include_directories(ffmpeg_viewer PRIVATE 
+    ${FFMPEG_INCLUDE_DIRS} 
+    ${OpenCV_INCLUDE_DIRS}
+    ${cppzmq_INCLUDE_DIR}
+    ${ZeroMQ_INCLUDE_DIR}
+    ${PROJECT_SOURCE_DIR}/src/
+    ${PROJECT_SOURCE_DIR}/3rd/json/
+    ${PROJECT_SOURCE_DIR}/3rd/argparse/
+)
+
+target_link_libraries(ffmpeg_viewer PUBLIC 
+    ${FFMPEG_LIBRARIES} 
+    ${ZeroMQ_LIBRARY}
+    ${OpenCV_LIBS}
+)
+
