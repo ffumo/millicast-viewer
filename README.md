@@ -20,7 +20,9 @@ Utility for capturing Millicast stream
 - Install Ubuntu package:
 
 ```
-sudo apt install build-essential yasm cmake libx264-dev libx265-dev libvpx-dev libfdk-aac-dev libopus-dev
+sudo apt install build-essential yasm nasm \
+    libssl-dev libx264-dev libx265-dev \
+    libvpx-dev libfdk-aac-dev libopus-dev
 ```
 
 ```
@@ -31,6 +33,17 @@ sudo apt install -y libx11-dev libxfixes-dev libxdamage-dev libxcomposite-dev li
 ```
 sudo apt install -y unzip
 ```
+
+- Install PulseAudio that required for Millicast SDK
+```
+sudo apt install pulseaudio 
+```
+
+- Enable linger for deployment user
+```
+sudo loginctl enable-linger msservice   
+```
+
 
 
 - Download thirdparty libraries<br/>
@@ -61,7 +74,7 @@ sudo apt install -y unzip
         ```
         - Download latest version of SDK
         ```
-        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.2/millicast-native-sdk-2.5.2-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
+        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.4/millicast-native-sdk-2.5.4-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
 
         ar vx 3rd/millicast.deb --output 3rd/
 

@@ -8,6 +8,7 @@ echo "ROOT_DIR: ${ROOT_DIR}"
 OPENCV_LIB="${ROOT_DIR}/lib/opencv/lib"
 ZMQ_LIB="${ROOT_DIR}/lib/zeromq/lib"
 ZMQCPP_LIB="${ROOT_DIR}/lib/cppzmq/lib"
+FFMPEG_LIB="${ROOT_DIR}/lib/ffmpeg/lib"
 
 # SYS_LIB2="/usr/lib/x86_64-linux-gnu"
 # SYS_LIB=""
@@ -23,4 +24,4 @@ case "${unameOut}" in
 esac
 
 
-export LD_LIBRARY_PATH=${OPENCV_LIB}:${ZMQ_LIB}:${ZMQCPP_LIB}:${MILLICAST_LIB}:${MILLICAST_EXT_LIB}:${ADDI_SYS_LIB}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+export LD_LIBRARY_PATH=${FFMPEG_LIB}:${OPENCV_LIB}:${ZMQ_LIB}:${ZMQCPP_LIB}:${MILLICAST_LIB}:${MILLICAST_EXT_LIB}:${ADDI_SYS_LIB}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}

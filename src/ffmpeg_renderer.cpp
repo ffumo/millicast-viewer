@@ -124,8 +124,9 @@ void FFmpegRenderer::on_frame(const cv::Mat& frame) {
         
         
         // Calculate frame FPS
-        std::chrono::duration<float> time_diff = std::chrono::high_resolution_clock::now() - image_tp_;
-        image_tp_ = std::chrono::high_resolution_clock::now();
+        auto now = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> time_diff = now - image_tp_;
+        image_tp_ = now;
         if (frame_fps_ < 10 || frame_fps_ > 40)
         {
             // Fast update frame FPS

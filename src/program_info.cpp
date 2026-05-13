@@ -48,7 +48,7 @@ void ProgramInfo::parse_arguments(int argc, char* argv[]){
         _disable_stats = program_ptr->get<bool>("--quiet");
     }
     catch (const std::exception& err) {
-        std::cerr << err.what() << std::endl;
+        std::cerr << "Error in parser argument: " << err.what() << std::endl;
         std::cerr << program_ptr.get();
         std::exit(EXIT_FAILURE);
     }

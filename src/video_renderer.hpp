@@ -1,5 +1,5 @@
-#ifndef __VIDEO_RENDERER__
-#define __VIDEO_RENDERER__
+#ifndef __VIDEO_RENDERER_HPP__
+#define __VIDEO_RENDERER_HPP__
 
 #include <memory>
 #include <atomic>
@@ -81,4 +81,4 @@ public:
 
 }
 
-#endif /* __VIDEO_RENDERER__ */
+#endif /* __VIDEO_RENDERER_HPP__ */

@@ -36,6 +36,7 @@ private:
     std::thread decode_worker_;
     std::thread onframe_worker_;
     std::mutex mutex_;
+    std::condition_variable_any cv_;
     // std::mutex 
     std::vector<std::shared_ptr<FFmpegRenderer>> video_renderers_;
 
@@ -53,94 +54,121 @@ private:
     // void (*on_frame_callback)(const cv::Mat&) = nullptr;
     AVPacket* packet = nullptr;
     AVFrame* pFrame = nullptr;
+    uint8_t* buffer = nullptr;
+    AVFrame* pFrameBGR = nullptr;
     struct SwsContext* sws_ctx = nullptr;
 
+    // Decode loop function
     void decode_loop() {
         try {
             packet = av_packet_alloc();
             pFrame = av_frame_alloc();
             
-            // Setup Scaler for BGR24
+            // 1. Setup Scaler for BGR24
             sws_ctx = sws_getContext(
                 pCodecCtx->width, pCodecCtx->height, pCodecCtx->pix_fmt,
                 pCodecCtx->width, pCodecCtx->height, AV_PIX_FMT_BGR24,
                 SWS_BILINEAR, NULL, NULL, NULL);
 
+            int width = pCodecCtx->width;
+            int height = pCodecCtx->height;
+            
+            // 2. Prepare BGR24 frame buffer
+            // Exact size FFmpeg wants for BGR24
+            int num_bytes = av_image_get_buffer_size(AV_PIX_FMT_BGR24, width, height, 32); // 32-byte align
+            // Prepare BGR24 buffer data
+            buffer = (uint8_t*)av_malloc(num_bytes * sizeof(uint8_t));
+            // Map this buffer to a temporary frame for swscale
+            pFrameBGR = av_frame_alloc();
+            av_image_fill_arrays(pFrameBGR->data, pFrameBGR->linesize, buffer, 
+                                AV_PIX_FMT_BGR24, width, height, 32);
+            
+            // 3. Prevent drifting
+            auto stream_start_time = std::chrono::steady_clock::now();
+            int64_t first_dts = AV_NOPTS_VALUE;
+            bool frame_drifted_flag = false;
+            AVRational stream_time_base = pFormatCtx->streams[videoStream]->time_base;
+
+            // Notify to start iteration loop
+            cv_.notify_one();
             while (running_flg_) {
                 // Read packets as fast as possible to keep buffer empty
                 if (av_read_frame(pFormatCtx, packet) >= 0) {
                     if (packet->stream_index == videoStream) {
+                        // Track timestamps to identify stream drift
+                        if (first_dts == AV_NOPTS_VALUE && packet->dts != AV_NOPTS_VALUE) {
+                            first_dts = packet->dts;
+                            stream_start_time = std::chrono::steady_clock::now();
+                        }
+
+                        if ((first_dts != AV_NOPTS_VALUE) && (packet->dts != AV_NOPTS_VALUE)) {
+                            // Calculate how long the stream has been playing in real life vs stream timestamps
+                            auto elapsed_real = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - stream_start_time).count();
+                            
+                            // Convert stream timebase to milliseconds
+                            int64_t elapsed_stream = (packet->dts - first_dts) * 1000 * stream_time_base.num / stream_time_base.den;
+                            
+                            auto time_diff = elapsed_real - elapsed_stream;
+                            // Danger lag detected
+                            if (time_diff > 5000) {
+                                std::cerr<<"[ERR] Critical lag detected: " << time_diff <<" ms. Reconnecting stream to reset hardware buffers..."<< std::endl;
+                                throw std::runtime_error("[ERR] Critical lag detected. Reconnecting stream to reset hardware buffers...");
+                            }
+                            // DRIFT DETECTION: If stream time is > 500ms behind real time, drop it!
+                            else if (time_diff > 500) {
+                                frame_drifted_flag = true;
+                            }
+                            else if (time_diff < 100) {
+                                frame_drifted_flag = false;
+                            }
+                        }
+
+                        // Crucial: Only drop safely if it's NOT a keyframe (to avoid breaking the group of pictures)
+                        if (frame_drifted_flag && !(packet->flags & AV_PKT_FLAG_KEY)) {
+                            av_packet_unref(packet);
+                            continue; // Skip decoding this frame entirely
+                        }
+
                         if (avcodec_send_packet(pCodecCtx, packet) == 0) {
 
                             while (avcodec_receive_frame(pCodecCtx, pFrame) == 0) {
-                                // Convert directly to a temporary Mat
-                                cv::Mat tmp(pCodecCtx->height, pCodecCtx->width, CV_8UC3);
-                                uint8_t* dest[] = { tmp.data };
-                                int destLinesize[] = { (int)tmp.step };
+                                // Convert frame to BGR24 format
                                 sws_scale(sws_ctx, pFrame->data, pFrame->linesize, 0, 
-                                        pCodecCtx->height, dest, destLinesize);
-                                
-                                // 2. Update shared "Latest" frame (Atomic Swap)
+                                        height, pFrameBGR->data, pFrameBGR->linesize);
+
+                                // Wrap the buffer in a cv::Mat safely
+                                cv::Mat tmp(height, width, CV_8UC3, pFrameBGR->data[0], pFrameBGR->linesize[0]);
+
+                                // Update shared "Latest" frame (Atomic Swap)
                                 {
                                     std::lock_guard<std::mutex> lock(mutex_);
-                                    latest_frame_ = tmp; // Shallow copy of cv::Mat is fine here because tmp is local
+                                    // latest_frame_ = tmp; // Shallow copy of cv::Mat is fine here because tmp is local
+                                    latest_frame_ = tmp.clone();
                                     has_new_frame_flg_ = true;
                                 }
-
                             }
-
                         }
                     }
                     av_packet_unref(packet);
                 }
-
-                // Thread-safe update of the "latest" frame
-                // if (has_new_frame_flg_) {
-                //     std::lock_guard<std::mutex> lock(mutex_);
-                //     // latest_frame_ = tmp.clone(); // Shallow copy isn't enough, we need the data
-                //     // Update frame to renderer, 
-                //     has_new_frame_flg_ = false;
-                //     video_renderers_.back()->on_frame(latest_frame_);
-                //     // onframe_worker_ = std::thread(&StreamDecoder::on_frame, this);
-                // }
-
-                // // 1. DRAIN ALL PENDING PACKETS
-                // // This clears the network buffer so you are always at the "head"
-                // while (av_read_frame(pFormatCtx, packet) >= 0) {
-                //     if (packet->stream_index == videoStream) {
-                //         avcodec_send_packet(pCodecCtx, packet);
-                //     }
-                //     av_packet_unref(packet);
-                    
-                //     // Break after reading a few packets to check for a decoded frame
-                //     // This prevents being stuck in an infinite read loop
-                //     if (pFormatCtx->pb && pFormatCtx->pb->buffer_size < 1024) break; 
-                // }
-
-                // // 2. GET THE LATEST DECODED FRAME
-                // // We only care about the most recent frame the decoder can give us
-                // while (avcodec_receive_frame(pCodecCtx, pFrame) == 0) {
-                //     // Convert to cv::Mat only for the LAST frame received
-                //     sws_scale(sws_ctx, pFrame->data, pFrame->linesize, 0, 
-                //             pCodecCtx->height, dest, destLinesize);
-                // }
             }
         }
+        catch (std::runtime_error &ex){
+            std::cerr<<"Runtime error in decode_loop:"<< ex.what() << std::endl;
+        }
         catch (...){
-            std::cerr<<"Error in decode_loop"<<std::endl;
+            std::cerr<<"Unhandled error in decode_loop"<<std::endl;
         }
 
+        if (buffer) av_free(buffer);
+        if (pFrameBGR) av_frame_free(&pFrameBGR);
         running_flg_ = false;
         av_frame_free(&pFrame);
         av_packet_free(&packet);
         sws_freeContext(sws_ctx);
 
-    }
-
-    // void on_frame() {
-    //     std::lock_guard<std::mutex> lock(mutex_);
-    //     video_renderers_.back()->on_frame(latest_frame_);
-    // }
+    } // End of decode_loop
 
 public:
     StreamDecoder(const std::string& stream_url) : stream_url_(stream_url) {}
@@ -189,13 +217,28 @@ public:
         pCodecCtx = avcodec_alloc_context3(pCodec);
         avcodec_parameters_to_context(pCodecCtx, pFormatCtx->streams[videoStream]->codecpar);
         
+        /*******************************
+        * Performance improvement flags
+        *******************************/
+
         // Disable frame reordering (removes the delay caused by B-frames)
         // pCodecCtx->has_b_frames = 0; 
 
         // Low Latency Decoder Flags
         pCodecCtx->flags |= AV_CODEC_FLAG_LOW_DELAY;
+
+        // Explicitly skips decoding any frame that is not used as a reference point.
+        // This instantly drops the work your CPU has to do from 60fps to ~30fps.
+        // pCodecCtx->skip_frame = AVDISCARD_NONREF;
+
+        // Can drop more frame if needed
+        // pCodecCtx->skip_frame = AVDISC_CARD_BIDIR; 
+
         // For H.264, use one thread to avoid frame-threading latency (optional)
         pCodecCtx->thread_count = 1; 
+        // pCodecCtx->thread_count = 0; 
+        // pCodecCtx->thread_type = FF_THREAD_SLICE; 
+        /******************************/
 
         if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) {
             std::cerr << "Failed to set Decoder Flag"<< std::endl;
@@ -210,26 +253,23 @@ public:
         return true;
     }
 
-    // void set_callback(void (*cb)(const cv::Mat&)) {
-    //     on_frame_callback = cb;
-    // }
-
-    // Thread safe of starting render
+    /************ Thread safe of starting render ***************/
     void start_render_loop(std::string config_file, int stream_id=1, bool display=false) {
         // Wait for the first track come
-        // {
-        //     std::unique_lock lock(mutex_);
-        //     if (tracks_to_render_.empty()) {
-        //         std::cout<<"Wait for getting track\n";
-        //         // cv_.wait(lock, [this]() { return !tracks_to_render_.empty(); });
-        //         // Set timeout 7 seconds for waiting 
-        //         if(!cv_.wait_for(lock, std::chrono::seconds(5), [this]() { return !tracks_to_render_.empty(); }))
-        //         {
-        //             throw std::runtime_error("start_render_loop timeout after 7 seconds");
-        //         }
-        //         std::cout<<"Get track success\n";
-        //     }
-        // }
+        {
+            std::unique_lock lock(mutex_);
+            if (sws_ctx==nullptr) {
+                std::cout<<"Wait for getting track\n";
+                // cv_.wait(lock, [this]() { return !tracks_to_render_.empty(); });
+                // Set timeout 7 seconds for waiting 
+                if(!cv_.wait_for(lock, std::chrono::seconds(5), [this]() { return sws_ctx!=nullptr; }))
+                {
+                    throw std::runtime_error("start_render_loop timeout after 7 seconds");
+                }
+                std::cout<<"Get track success\n";
+            }
+        }
+
         std::string render_name = "Track " + std::to_string((int)video_renderers_.size());
         std::shared_ptr<FFmpegRenderer> render = std::make_shared<FFmpegRenderer>(render_name);
         printf("Create render: %s\n", render_name.c_str());
@@ -249,32 +289,15 @@ public:
                 }
             }
 
-            if (ready && render) {
+            if (ready && render && running_flg_) {
+                ready = false;
                 render->on_frame(frame_to_process);
             }
 
             videostream::VideoRenderer::run_iteration(render);
         }
     }
-
-    // This is the iteration function you requested
-    // void run_iteration() {
-    //     cv::Mat frame_to_process;
-    //     bool ready = false;
-
-    //     {
-    //         std::lock_guard<std::mutex> lock(frame_mutex);
-    //         if (has_new_frame) {
-    //             frame_to_process = latest_frame;
-    //             has_new_frame = false;
-    //             ready = true;
-    //         }
-    //     }
-
-    //     if (ready && on_frame_callback) {
-    //         on_frame_callback(frame_to_process);
-    //     }
-    // }
+    /**********************/
 
 };
 
@@ -301,9 +324,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 
     try{
         // Set the credentials and enable the stats
-        json stream_config = config_["source"]["entries"][0];
-        std::string url = stream_config["url"];
-        std::cout<<"Get stream: "<< stream_config <<std::endl;
+        json streams_config = config_["source"]["entries"];
+
+        std::string url = "";
+        // json streams_config;
+        for (const auto& item: streams_config) {
+            if (item.contains("url")) {
+                url = item["url"];
+            }
+        }
+        
+        std::cout<<"Get stream: "<< streams_config <<std::endl;
         std::cout<<"Stream url: "<< url <<std::endl;
 
         StreamDecoder decoder(url);

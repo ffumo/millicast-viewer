@@ -33,6 +33,7 @@ esac
   --enable-avcodec \
   --enable-libx264 \
   --enable-openssl \
+  --enable-nonfree \
   --enable-avdevice \
   --enable-indev=${INDEV_FLAG} \
   --enable-protocol=rtp,rtsp,udp,tcp,http,rtmp,rtmps,https \
