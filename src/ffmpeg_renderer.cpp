@@ -155,6 +155,7 @@ void FFmpegRenderer::on_frame(const cv::Mat& frame) {
         std::stringstream ss;
         ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
         printf("[%s] image FPS: %.2f, %d x %d\n", ss.str().c_str(), frame_fps_, width_, height_);
+        fflush(stdout); // Forces the text out of the buffer and into PM2 logs
     }
 }
 

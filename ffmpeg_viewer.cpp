@@ -44,6 +44,7 @@ private:
     cv::Mat latest_frame_;
     // cv::Mat shared_frame_;
     bool has_new_frame_flg_ = false;
+    std::string decode_info_ext_ = "";
 
     // FFmpeg state
     AVFormatContext* pFormatCtx = nullptr;
@@ -87,7 +88,12 @@ private:
             auto stream_start_time = std::chrono::steady_clock::now();
             int64_t first_dts = AV_NOPTS_VALUE;
             bool frame_drifted_flag = false;
+            auto drift_start_time = std::chrono::steady_clock::now();
+            auto stable_start_time = std::chrono::steady_clock::now();
             AVRational stream_time_base = pFormatCtx->streams[videoStream]->time_base;
+            
+            // 
+            std::string decode_info = "";
 
             // Notify to start iteration loop
             cv_.notify_one();
@@ -95,37 +101,73 @@ private:
                 // Read packets as fast as possible to keep buffer empty
                 if (av_read_frame(pFormatCtx, packet) >= 0) {
                     if (packet->stream_index == videoStream) {
+
+                        bool is_keyframe = (packet->flags & AV_PKT_FLAG_KEY);
+                        auto now = std::chrono::steady_clock::now();
+                        auto time_t_now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
                         // Track timestamps to identify stream drift
                         if (first_dts == AV_NOPTS_VALUE && packet->dts != AV_NOPTS_VALUE) {
                             first_dts = packet->dts;
-                            stream_start_time = std::chrono::steady_clock::now();
+                            stream_start_time = now;
+                            stable_start_time = now;
+                            std::stringstream ss;
+                            ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S") <<" Initial the first DTS"<<std::endl;
+                            decode_info += ss.str();
                         }
-
+                        
+                        // DTS event handling
                         if ((first_dts != AV_NOPTS_VALUE) && (packet->dts != AV_NOPTS_VALUE)) {
                             // Calculate how long the stream has been playing in real life vs stream timestamps
-                            auto elapsed_real = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                std::chrono::steady_clock::now() - stream_start_time).count();
+                            auto elapsed_real = std::chrono::duration_cast<std::chrono::milliseconds>(now - stream_start_time).count();
                             
                             // Convert stream timebase to milliseconds
                             int64_t elapsed_stream = (packet->dts - first_dts) * 1000 * stream_time_base.num / stream_time_base.den;
                             
                             auto time_diff = elapsed_real - elapsed_stream;
+                            if (time_diff < 0) time_diff = 0;
+
                             // Danger lag detected
                             if (time_diff > 5000) {
-                                std::cerr<<"[ERR] Critical lag detected: " << time_diff <<" ms. Reconnecting stream to reset hardware buffers..."<< std::endl;
+                                std::cerr<<"[ERR] Critical lag detected: " << time_diff <<" ms"<< std::endl;
                                 throw std::runtime_error("[ERR] Critical lag detected. Reconnecting stream to reset hardware buffers...");
                             }
                             // DRIFT DETECTION: If stream time is > 500ms behind real time, drop it!
-                            else if (time_diff > 500) {
+                            else if (!frame_drifted_flag && (time_diff > 500)) {
                                 frame_drifted_flag = true;
+                                drift_start_time = now;
+                                std::stringstream ss;
+                                ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
+                                ss << " Drift is detected.";
+                                ss << " Time diff: "<<time_diff<<" ms"<<std::endl;
+                                decode_info += ss.str();
                             }
-                            else if (time_diff < 100) {
+                            else if (time_diff < 150) {
+                                if (frame_drifted_flag) stable_start_time = now;
                                 frame_drifted_flag = false;
+
+                                auto stable_dur = std::chrono::duration_cast<std::chrono::milliseconds>(now - stable_start_time).count();
+                                if (is_keyframe && (time_diff > 35) && (stable_dur > 3000)) {
+                                    first_dts = packet->dts;
+                                    stream_start_time = now;
+                                    stable_start_time = now;
+                                    std::stringstream ss;
+                                    ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
+                                    ss << " Reinit the first DTS.";
+                                    ss << " Time diff: "<<time_diff<<" ms"<<std::endl;
+                                    decode_info += ss.str();
+                                }
                             }
                         }
 
+                        // Reset due to long drifting
+                        auto elapsed_drift = std::chrono::duration_cast<std::chrono::milliseconds>(now - drift_start_time).count();
+                        if (frame_drifted_flag && (elapsed_drift > 5000)) {
+                            std::cerr<<"[ERR] Long drifting detected: " << elapsed_drift <<" ms"<< std::endl;
+                            throw std::runtime_error("[ERR] Long drifting detected. Reconnecting stream to reset hardware buffers...");
+                        }
+
                         // Crucial: Only drop safely if it's NOT a keyframe (to avoid breaking the group of pictures)
-                        if (frame_drifted_flag && !(packet->flags & AV_PKT_FLAG_KEY)) {
+                        if (frame_drifted_flag && !is_keyframe) {
                             av_packet_unref(packet);
                             continue; // Skip decoding this frame entirely
                         }
@@ -146,6 +188,8 @@ private:
                                     // latest_frame_ = tmp; // Shallow copy of cv::Mat is fine here because tmp is local
                                     latest_frame_ = tmp.clone();
                                     has_new_frame_flg_ = true;
+                                    decode_info_ext_ = decode_info;
+                                    decode_info = "";
                                 }
                             }
                         }
@@ -235,9 +279,9 @@ public:
         // pCodecCtx->skip_frame = AVDISC_CARD_BIDIR; 
 
         // For H.264, use one thread to avoid frame-threading latency (optional)
-        pCodecCtx->thread_count = 1; 
-        // pCodecCtx->thread_count = 0; 
-        // pCodecCtx->thread_type = FF_THREAD_SLICE; 
+        // pCodecCtx->thread_count = 1; 
+        pCodecCtx->thread_count = 0; 
+        pCodecCtx->thread_type = FF_THREAD_SLICE; 
         /******************************/
 
         if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) {
@@ -279,18 +323,27 @@ public:
 
         cv::Mat frame_to_process;
         bool ready = false;
+        std::string decode_info = "";
         while (running_flg_) {
             {
                 std::lock_guard<std::mutex> lock(mutex_);
                 if (has_new_frame_flg_) {
                     frame_to_process = latest_frame_.clone();
                     has_new_frame_flg_ = false;
+                    if (decode_info_ext_.length()) {
+                        decode_info = decode_info_ext_;
+                        decode_info_ext_ = "";
+                    }
                     ready = true;
                 }
             }
 
             if (ready && render && running_flg_) {
                 ready = false;
+                if (decode_info.length()){
+                    std::cout<<"Decode info: "<<decode_info<<std::endl;
+                    decode_info = "";
+                }
                 render->on_frame(frame_to_process);
             }
 
