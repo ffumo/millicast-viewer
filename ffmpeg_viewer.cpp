@@ -218,6 +218,17 @@ public:
     StreamDecoder(const std::string& stream_url) : stream_url_(stream_url) {}
 
     ~StreamDecoder() {
+        terminate();
+        // running_flg_ = false;
+        // if (decode_worker_.joinable()) decode_worker_.join();
+        // avcodec_free_context(&pCodecCtx);
+        // avformat_close_input(&pFormatCtx);
+        // av_frame_free(&pFrame);
+        // av_packet_free(&packet);
+        // sws_freeContext(sws_ctx);
+    }
+
+    bool terminate() {
         running_flg_ = false;
         if (decode_worker_.joinable()) decode_worker_.join();
         avcodec_free_context(&pCodecCtx);
@@ -225,6 +236,7 @@ public:
         av_frame_free(&pFrame);
         av_packet_free(&packet);
         sws_freeContext(sws_ctx);
+
     }
 
     bool init() {
@@ -347,8 +359,13 @@ public:
                 render->on_frame(frame_to_process);
             }
 
-            videostream::VideoRenderer::run_iteration(render);
+            if (!videostream::VideoRenderer::run_iteration(render)) {
+                std::cout<<"Error in render run_iteration" << std::endl;
+                break;
+            }
         }
+        running_flg_ = false;
+        return;
     }
     /**********************/
 
@@ -396,10 +413,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
             return -1;
         }
         decoder.start_render_loop(args.config_file, args.stream_id, args.display);
+        decoder.terminate();
     }
     catch (...) {
         std::cerr<<"Unhandled exception in play stream"<<std::endl;
     }
-
+    
+    std::cout<<"End Viewer"<<std::endl;
     return 0;
 }

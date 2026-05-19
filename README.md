@@ -61,7 +61,7 @@ sudo loginctl enable-linger msservice
         ```
 
         ```shell
-        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.4/millicast-native-sdk-2.5.4-macos-arm64.zip -O 3rd/millicast.zip
+        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.5/millicast-native-sdk-2.5.5-macos-arm64.zip -O 3rd/millicast.zip
 
         unzip 3rd/millicast.zip -d 3rd && mv 3rd/usr lib/millicast
         ```
@@ -74,7 +74,7 @@ sudo loginctl enable-linger msservice
         ```
         - Download latest version of SDK
         ```
-        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.4/millicast-native-sdk-2.5.4-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
+        wget https://github.com/millicast/millicast-native-sdk/releases/download/v2.5.5/millicast-native-sdk-2.5.5-ubuntu22-x64-gnu-std.deb -O 3rd/millicast.deb
 
         ar vx 3rd/millicast.deb --output 3rd/
 
