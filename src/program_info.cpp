@@ -5,7 +5,9 @@
 
 
 ProgramInfo::ProgramInfo(std::string name): name(name), 
-    config_file(_config_file), display(_display), disable_stats(_disable_stats), stream_id(_stream_id) {
+    config_file(_config_file), display(_display), 
+    disable_stats(_disable_stats), stream_id(_stream_id), 
+    debug(_debug), sampling_mode(_sampling_mode) {
     
     version = build_info::version +
                             "\nSDK version: " + build_info::millicast_sdk_version + 
@@ -37,6 +39,18 @@ ProgramInfo::ProgramInfo(std::string name): name(name),
         // .default_value(true)
         .implicit_value(true);
 
+    program_ptr->add_argument("-s", "--sample")
+        .help("Run viewer in sampling mode")
+        .default_value(false)
+        // .default_value(true)
+        .implicit_value(true);
+
+    program_ptr->add_argument("--debug")
+        .help("enable debug logs")
+        .default_value(false)
+        // .default_value(true)
+        .implicit_value(true);
+
 }
 
 void ProgramInfo::parse_arguments(int argc, char* argv[]){
@@ -46,6 +60,8 @@ void ProgramInfo::parse_arguments(int argc, char* argv[]){
         _display = program_ptr->get<bool>("--display");
         _stream_id = program_ptr->get<int>("--id");
         _disable_stats = program_ptr->get<bool>("--quiet");
+        _debug = program_ptr->get<bool>("--debug");
+        _sampling_mode = program_ptr->get<bool>("--sample");
     }
     catch (const std::exception& err) {
         std::cerr << "Error in parser argument: " << err.what() << std::endl;
@@ -60,4 +76,6 @@ void ProgramInfo::print_args() {
     std::cout << "display: "<< display << std::endl;
     std::cout << "stream_id: "<< stream_id << std::endl;
     std::cout << "disable_stats: "<< disable_stats << std::endl;
+    std::cout << "debug: "<< debug << std::endl;
+    std::cout << "sampling_mode: "<< sampling_mode << std::endl;
 }

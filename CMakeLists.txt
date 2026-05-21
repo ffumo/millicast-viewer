@@ -97,6 +97,8 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(millicast_viewer
     millicast_viewer.cpp
+    ${PROJECT_SOURCE_DIR}/src/program_info.hpp
+    ${PROJECT_SOURCE_DIR}/src/program_info.cpp
     ${PROJECT_SOURCE_DIR}/src/millicast_renderer.cpp
     ${PROJECT_SOURCE_DIR}/src/millicast_renderer.hpp
     ${PROJECT_SOURCE_DIR}/src/video_renderer.cpp

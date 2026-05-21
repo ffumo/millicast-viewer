@@ -26,6 +26,7 @@
 // #ifdef WITH_CV_RENDERER
 #include "argparse.hpp"
 // #include "cv_renderer.h"
+#include "src/program_info.hpp"
 #include "src/video_renderer.hpp"
 #include "src/millicast_renderer.hpp"
 // #endif
@@ -65,7 +66,7 @@ class TrackManager {
 
 public:
     TrackManager() = default;
-    void start_render_loop(std::string config_file, int stream_id=1, bool display=false) {
+    void start_render_loop(std::string config_file, int stream_id=1, bool display=false, bool sampling_mode=false) {
         // wait for the first track to come before running the render loop
         {
             std::unique_lock lock(mutex_);
@@ -85,17 +86,18 @@ public:
             if (!tracks_to_render_.empty()) {
                 auto* track = tracks_to_render_.front();
                 tracks_to_render_.pop_front();
-                track->enable(add_renderer(config_file, stream_id, display));
+                track->enable(add_renderer(config_file, stream_id, display, sampling_mode));
                 printf("Added render: %ld\n", renderers_.size());
             }
         } while (videostream::VideoRenderer::run_iteration(renderers_.back()));
     }
 
-    const std::shared_ptr<MillicastRenderer>& add_renderer(std::string config_file, int stream_id=1, bool display=false) {
-        std::string render_name = "Track " + std::to_string((int)renderers_.size());
+    const std::shared_ptr<MillicastRenderer>& add_renderer(std::string config_file, int stream_id=1, bool display=false, bool sampling_mode=false) {
+        std::string render_name = "Track_" + std::to_string((int)renderers_.size());
         printf("Create render: %s\n", render_name.c_str());
         std::shared_ptr<MillicastRenderer> render = std::make_shared<MillicastRenderer>(render_name);
         render->display_ = display;
+        render->sampling_mode_ = sampling_mode;
         renderers_.push_back(render);
         renderers_.back()->init(config_file, stream_id);
         printf("Created render: %s\n", render->title_.c_str());
@@ -283,62 +285,67 @@ void disconnect_event_handlers(
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
-    std::string version = build_info::version +
-                            "\nSDK version: " + build_info::millicast_sdk_version + 
-                            "\nBuild time " + build_info::build_date + " " + build_info::build_time;
-    argparse::ArgumentParser program("Millicast viewer", version);
+    // std::string version = build_info::version +
+    //                         "\nSDK version: " + build_info::millicast_sdk_version + 
+    //                         "\nBuild time " + build_info::build_date + " " + build_info::build_time;
+    // argparse::ArgumentParser program("Millicast viewer", version);
 
-    program.add_argument("-c", "--config")
-        // .default_value(std::string{"configs/sample_config.json"})
-        .required()
-        .help("configuration file");
+    // program.add_argument("-c", "--config")
+    //     // .default_value(std::string{"configs/sample_config.json"})
+    //     .required()
+    //     .help("configuration file");
 
-    program.add_argument("--id")
-        .default_value(1)
-        .help("stream id in configuration file")
-        .scan<'i', int>();
+    // program.add_argument("--id")
+    //     .default_value(1)
+    //     .help("stream id in configuration file")
+    //     .scan<'i', int>();
 
-    program.add_argument("-d", "--display")
-        .help("enable display")
-        .default_value(false)
-        // .default_value(true)
-        .implicit_value(true);
+    // program.add_argument("-d", "--display")
+    //     .help("enable display")
+    //     .default_value(false)
+    //     // .default_value(true)
+    //     .implicit_value(true);
 
-    program.add_argument("-q", "--quiet")
-        .help("disable showing SDK stats")
-        .default_value(false)
-        // .default_value(true)
-        .implicit_value(true);
+    // program.add_argument("-q", "--quiet")
+    //     .help("disable showing SDK stats")
+    //     .default_value(false)
+    //     // .default_value(true)
+    //     .implicit_value(true);
 
-    try {
-        program.parse_args(argc, argv);
-    }
-    catch (const std::exception& err) {
-        std::cerr << err.what() << std::endl;
-        std::cerr << program;
-        std::exit(EXIT_FAILURE);
-    }
-    auto config_file = program.get<std::string>("--config");  // "orange"
-    auto display = program["--display"] == true;
-    auto stream_id = program.get<int>("--id");
-    auto disable_stats = program["--quiet"] == true;
+    // try {
+    //     program.parse_args(argc, argv);
+    // }
+    // catch (const std::exception& err) {
+    //     std::cerr << err.what() << std::endl;
+    //     std::cerr << program;
+    //     std::exit(EXIT_FAILURE);
+    // }
+    // auto config_file = program.get<std::string>("--config");  // "orange"
+    // auto display = program["--display"] == true;
+    // auto stream_id = program.get<int>("--id");
+    // auto disable_stats = program["--quiet"] == true;
 
-    std::cout << "Version: "<< version << std::endl;
-    std::cout << "config_file: "<< config_file << std::endl;
-    std::cout << "display: "<< display << std::endl;
-    std::cout << "stream_id: "<< stream_id << std::endl;
-    std::cout << "disable_stats: "<< disable_stats << std::endl;
+    // std::cout << "Version: "<< version << std::endl;
+    // std::cout << "config_file: "<< config_file << std::endl;
+    // std::cout << "display: "<< display << std::endl;
+    // std::cout << "stream_id: "<< stream_id << std::endl;
+    // std::cout << "disable_stats: "<< disable_stats << std::endl;
+
+
+    ProgramInfo args = ProgramInfo("Millicast Viewer");
+    args.parse_arguments(argc, argv);
+    args.print_args();
 
     nlohmann::json config_;
     try{
-        std::ifstream f(config_file.c_str());
+        std::ifstream f(args.config_file.c_str());
         // Global config
         nlohmann::json g_config = json::parse(f);
         // Copy stream config 1
-        config_ = g_config["streams"]["stream_" + std::to_string(stream_id)];
+        config_ = g_config["streams"]["stream_" + std::to_string(args.stream_id)];
     }
     catch(const std::ifstream::failure& e){
-        std::cerr<<"Error in read configuration file: "<< config_file <<std::endl;
+        std::cerr<<"Error in read configuration file: "<< args.config_file <<std::endl;
         exit(EXIT_FAILURE);
     }
 
@@ -379,7 +386,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         std::cout<<"Get stream: "<< stream_config <<std::endl;
         wait(viewer->set_credentials(get_stream_credentials(stream_config["account_id"], stream_config["stream_name"], stream_token)));
 
-        if(disable_stats){
+        if(args.disable_stats){
             wait(viewer->enable_stats(false));
         }
         else {
@@ -403,7 +410,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 
         std::cout<<"Start render loop"<<std::endl;
         // Wait for any character to exit
-        track_manager->start_render_loop(config_file, stream_id, display);
+        track_manager->start_render_loop(args.config_file, args.stream_id, args.display, args.sampling_mode);
 
         // Unsubscribe and disconnect
         wait(viewer->unsubscribe());

@@ -42,6 +42,7 @@ VideoRenderer::VideoRenderer(const std::string &title) {
     image_tp_ = std::chrono::high_resolution_clock::now();
     report_tp_ = std::chrono::high_resolution_clock::now();
     viewer_start_tp_ = std::chrono::high_resolution_clock::now();
+    sampling_tp_ = std::chrono::high_resolution_clock::now();
 }
 
 VideoRenderer::~VideoRenderer() {
@@ -120,7 +121,27 @@ std::chrono::high_resolution_clock::time_point VideoRenderer::get_image_tp()
     return image_tp_;
 }
 
+void VideoRenderer::public_image(){
+    json j;
+    std::string s;
+    std::vector<uchar> buffer;
+    {
+        std::lock_guard lock(mutex_);
+        if (image_bgr_.empty()) return;
+        if (send_tp_ >= image_tp_) return;
+        
+        cv::imencode(".jpg", image_bgr_, buffer);
+        send_tp_ = image_tp_;
+    }
+    zmq_sock_p_->send((const void*)buffer.data(), buffer.size(), ZMQ_NOBLOCK);
+}
+
+
+std::mutex VideoRenderer::iteration_mutex_;
 bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) {
+    std::lock_guard lock(iteration_mutex_);
+    std::thread _zmq_thread = std::thread(&VideoRenderer::public_image, render);
+
     if (render->display_){
         // printf("[%s] Run iteration data size: %ld\n", render->title_.c_str(), render->image_data_.size());
         cv::Mat img = render->get_image_bgr();
@@ -145,9 +166,39 @@ bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) 
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     
+    std::chrono::duration<float> time_diff;
+    // Sampling image
+    time_diff = std::chrono::high_resolution_clock::now() - render->sampling_tp_;
+
+    if (render->sampling_mode_ && (time_diff.count() >= render->sampling_dur_))
+    {
+        render->sampling_tp_ = std::chrono::high_resolution_clock::now();
+        // 
+        cv::Mat img = render->get_image_bgr();
+        if (!img.empty()) {
+            auto time_t_now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+
+            std::stringstream file_name_ss;
+            file_name_ss << render->title_<<"_sample_"<<std::put_time(std::localtime(&time_t_now), "%Y%m%d_%H%M%S")<<".jpg";
+            cv::imwrite(file_name_ss.str(), img);
+            render->sampling_files.push_back(file_name_ss.str());
+            if (render->sampling_files.size() > 5) {
+                if (!std::remove(render->sampling_files.front().c_str())) {
+                    std::cout << "Error in delete file: " << render->sampling_files.front() << std::endl;
+                }
+                render->sampling_files.erase(render->sampling_files.begin());
+            }
+
+            std::stringstream ss;
+            ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
+            printf("[%s] Saved sample image: %s - %d x %d\n", ss.str().c_str(), file_name_ss.str().c_str(), img.rows, img.cols);
+        }
+
+    }
+
     if (render->has_frame_) {
         auto _image_tp = render->get_image_tp();
-        std::chrono::duration<float> time_diff = std::chrono::high_resolution_clock::now() - _image_tp;
+        time_diff = std::chrono::high_resolution_clock::now() - _image_tp;
         // If noframe_timeout_ is set, then check timeout
         if ((render->noframe_timeout_ > 0.5f) && (time_diff.count() > render->noframe_timeout_)) {
             // throw std::runtime_error("Error no frame after: " + std::to_string(time_diff.count()));
@@ -157,7 +208,7 @@ bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) 
         }
     }
     else {
-        std::chrono::duration<float> time_diff = std::chrono::high_resolution_clock::now() - render->viewer_start_tp_;
+        time_diff = std::chrono::high_resolution_clock::now() - render->viewer_start_tp_;
         if ((render->viewer_start_timeout_ > 0.5f) && (time_diff.count() > render->viewer_start_timeout_)) {
             // throw std::runtime_error("Error no frame after: " + std::to_string(time_diff.count()));
             printf("Error no frame after: %f seconds\n", time_diff.count());
@@ -165,7 +216,13 @@ bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) 
             return false;
         }
     }
-    render->public_image();
+    fflush(stdout); 
+
+    // render->public_image();
+    if (_zmq_thread.joinable()) {
+        _zmq_thread.join();
+    }
+
     return true;
 }
 
@@ -174,21 +231,6 @@ void VideoRenderer::destroy() {
 
 void VideoRenderer::on_destroyed(){
 
-}
-
-void VideoRenderer::public_image(){
-    json j;
-    std::string s;
-    std::vector<uchar> buffer;
-    {
-        std::lock_guard lock(mutex_);
-        if (image_bgr_.empty()) return;
-        if (send_tp_ >= image_tp_) return;
-        
-        cv::imencode(".jpg", image_bgr_, buffer);
-        send_tp_ = image_tp_;
-    }
-    zmq_sock_p_->send((const void*)buffer.data(), buffer.size(), ZMQ_NOBLOCK);
 }
 
 void VideoRenderer::on_redraw() {

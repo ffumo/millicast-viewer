@@ -12,7 +12,9 @@ private:
     std::string _config_file;
     int _stream_id;
     bool _display;
+    bool _debug;
     bool _disable_stats;
+    bool _sampling_mode;
     
 public:
     ProgramInfo(std::string name);
@@ -22,5 +24,7 @@ public:
     const std::string & config_file;
     const int& stream_id;
     const bool& display;
+    const bool& debug;
+    const bool& sampling_mode;
     const bool& disable_stats;
 };

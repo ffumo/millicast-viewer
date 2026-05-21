@@ -19,9 +19,10 @@ public:
     // std::unique_ptr<uchar[]> _image;
     // std::vector<uchar> image_data_;
 
-    cv::Mat image_bgr_;
-
+    // Mutex protecting shared frame and timestamp 
     std::mutex mutex_;
+    std::chrono::high_resolution_clock::time_point image_tp_;
+    cv::Mat image_bgr_;
 
     zmq::context_t zmq_ctx_;
     std::string zmq_address_;
@@ -31,7 +32,6 @@ public:
 
     int width_;
     int height_;
-    std::chrono::high_resolution_clock::time_point image_tp_;
     // void init_();
     std::chrono::high_resolution_clock::time_point send_tp_;
     std::chrono::high_resolution_clock::time_point report_tp_;
@@ -49,23 +49,20 @@ public:
     // Starting app timeout, if has no frame after timeout, then exit viewer. Set 0 to disable
     float viewer_start_timeout_ = 5.0f;
 
+    float sampling_dur_ = 3.0f;
+
 // public:
     std::string title_;
     std::atomic_bool display_ = {false};
+    std::atomic_bool sampling_mode_ = {false};
+    std::chrono::high_resolution_clock::time_point sampling_tp_;
+    std::vector<std::string> sampling_files;
 
     VideoRenderer(const std::string &title);
     ~VideoRenderer();
 
     // void init();
 
-    /*
-    Init renderer with configuration file
-    @param config_file Configuration file that contain streams config in json format
-    @param stream_id Stream id. Default: 1
-    */
-    void init(const std::string &config_file, int stream_id=1);
-    // void on_frame(const millicast::VideoFrame& frame) override;
-    static bool run_iteration(const std::shared_ptr<VideoRenderer>& render);
 
     // utilities methods
     cv::Mat get_image_bgr();
@@ -77,6 +74,17 @@ public:
     void on_redraw();
     void draw();
     bool set_window_size(int w, int h);
+    /*
+    Init renderer with configuration file
+    @param config_file Configuration file that contain streams config in json format
+    @param stream_id Stream id. Default: 1
+    */
+    void init(const std::string &config_file, int stream_id=1);
+    // void on_frame(const millicast::VideoFrame& frame) override;
+    static bool run_iteration(const std::shared_ptr<VideoRenderer>& render);
+    private:
+    static std::mutex iteration_mutex_;
+
 };
 
 }

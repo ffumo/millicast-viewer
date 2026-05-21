@@ -29,21 +29,33 @@ extern "C" {
 using json = nlohmann::json;
 
 
+static void ffmpeg_log_callback(void* ptr, int level, const char* fmt, va_list vl) {
+    // Only process logs that meet your severity requirements
+    if (level > av_log_get_level()) return;
+
+    char buf[1024];
+    vsnprintf(buf, sizeof(buf), fmt, vl);
+    fprintf(stderr, "FFMPEG: %s", buf);
+}
+
 class StreamDecoder {
 private:
     std::string stream_url_;
     std::atomic<bool> running_flg_{false};
     std::thread decode_worker_;
     std::thread onframe_worker_;
-    std::mutex mutex_;
     std::condition_variable_any cv_;
-    // std::mutex 
+
+    // Video rendereres manager
     std::vector<std::shared_ptr<FFmpegRenderer>> video_renderers_;
 
-    // Shared latest frame
+    // Protecting mutex for shared variables in decoder
+    std::mutex mutex_;
+    // Shared latest frame from decoder
     cv::Mat latest_frame_;
-    // cv::Mat shared_frame_;
+    // New frame from decoder
     bool has_new_frame_flg_ = false;
+    // Extra info from decode loop
     std::string decode_info_ext_ = "";
 
     // FFmpeg state
@@ -197,6 +209,7 @@ private:
                     av_packet_unref(packet);
                 }
             }
+            std::cout<<"End decode_loop" << std::endl;
         }
         catch (std::runtime_error &ex){
             std::cerr<<"Runtime error in decode_loop:"<< ex.what() << std::endl;
@@ -219,24 +232,27 @@ public:
 
     ~StreamDecoder() {
         terminate();
-        // running_flg_ = false;
-        // if (decode_worker_.joinable()) decode_worker_.join();
-        // avcodec_free_context(&pCodecCtx);
-        // avformat_close_input(&pFormatCtx);
-        // av_frame_free(&pFrame);
-        // av_packet_free(&packet);
-        // sws_freeContext(sws_ctx);
     }
 
     bool terminate() {
+        // Cancel all running loop before lock mutex to avoid deadlock
         running_flg_ = false;
+        // Prevent running remaining loops code
+        std::lock_guard<std::mutex> lock(mutex_);
+        has_new_frame_flg_ = false;
+        // Join decode thread
         if (decode_worker_.joinable()) decode_worker_.join();
+        // The **-taking frees below null their argument, so they are safe to
+        // call twice. sws_freeContext takes its arg by value and does NOT null
+        // it, so we must null sws_ctx ourselves to avoid a double-free when
+        // terminate() is called both explicitly and from the destructor.
         avcodec_free_context(&pCodecCtx);
         avformat_close_input(&pFormatCtx);
         av_frame_free(&pFrame);
         av_packet_free(&packet);
         sws_freeContext(sws_ctx);
-
+        sws_ctx = nullptr;
+        return true;
     }
 
     bool init() {
@@ -270,6 +286,10 @@ public:
         }
 
         const AVCodec* pCodec = avcodec_find_decoder(pFormatCtx->streams[videoStream]->codecpar->codec_id);
+        if (!pCodec) {
+            std::cerr << "No decoder found for stream: " << stream_url_ << std::endl;
+            return false;
+        }
         pCodecCtx = avcodec_alloc_context3(pCodec);
         avcodec_parameters_to_context(pCodecCtx, pFormatCtx->streams[videoStream]->codecpar);
         
@@ -310,7 +330,7 @@ public:
     }
 
     /************ Thread safe of starting render ***************/
-    void start_render_loop(std::string config_file, int stream_id=1, bool display=false) {
+    void start_render_loop(std::string config_file, int stream_id=1, bool display=false, bool sampling_mode=false) {
         // Wait for the first track come
         {
             std::unique_lock lock(mutex_);
@@ -331,12 +351,14 @@ public:
         printf("Create render: %s\n", render_name.c_str());
         render->init(config_file, stream_id);
         render->display_ = display;
+        render->sampling_mode_ = sampling_mode;
         video_renderers_.push_back(render);
 
         cv::Mat frame_to_process;
         bool ready = false;
         std::string decode_info = "";
         while (running_flg_) {
+            // Atomic swap the latest frame to local variable for processing
             {
                 std::lock_guard<std::mutex> lock(mutex_);
                 if (has_new_frame_flg_) {
@@ -365,6 +387,7 @@ public:
             }
         }
         running_flg_ = false;
+        std::cout<<"End render loop" << std::endl;
         return;
     }
     /**********************/
@@ -391,6 +414,20 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    if (args.disable_stats) {
+        av_log_set_level(AV_LOG_QUIET);
+        std::cout<<"Disable FFMPEG log"<<std::endl;
+    }
+    else {
+        std::cout<<"Enable FFMPEG log"<<std::endl;
+        // av_log_set_level(AV_LOG_DEBUG);
+        av_log_set_level(AV_LOG_PANIC);
+        av_log_set_callback(ffmpeg_log_callback);
+        if (args.debug) {
+            av_log_set_level(AV_LOG_DEBUG);
+            std::cout<<"FFMPEG log debug mode"<<std::endl;
+        }
+    }
 
     try{
         // Set the credentials and enable the stats
@@ -410,10 +447,16 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         StreamDecoder decoder(url);
         if (!decoder.init()) {
             std::cerr << "Failed to init" << std::endl;
+            decoder.terminate();
             return -1;
         }
-        decoder.start_render_loop(args.config_file, args.stream_id, args.display);
+        decoder.start_render_loop(args.config_file, 
+                                    args.stream_id, 
+                                    args.display,
+                                    args.sampling_mode);
+        std::cout<<"Start terminate..."<<std::endl;
         decoder.terminate();
+        std::cout<<"Done"<<std::endl;
     }
     catch (...) {
         std::cerr<<"Unhandled exception in play stream"<<std::endl;
