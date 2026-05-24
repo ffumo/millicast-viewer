@@ -79,7 +79,7 @@ public:
     @param config_file Configuration file that contain streams config in json format
     @param stream_id Stream id. Default: 1
     */
-    void init(const std::string &config_file, int stream_id=1);
+    bool init(const std::string &config_file, int stream_id=1);
     // void on_frame(const millicast::VideoFrame& frame) override;
     static bool run_iteration(const std::shared_ptr<VideoRenderer>& render);
     private:

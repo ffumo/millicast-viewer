@@ -86,7 +86,12 @@ public:
             if (!tracks_to_render_.empty()) {
                 auto* track = tracks_to_render_.front();
                 tracks_to_render_.pop_front();
-                track->enable(add_renderer(config_file, stream_id, display, sampling_mode));
+                auto _render = add_renderer(config_file, stream_id, display, sampling_mode);
+                if (!_render) {
+                    std::cerr << "Failed to add renderer for track: " << track->source_id().value_or("null") << std::endl;
+                    break;
+                }
+                track->enable(_render);
                 printf("Added render: %ld\n", renderers_.size());
             }
         } while (videostream::VideoRenderer::run_iteration(renderers_.back()));
@@ -99,7 +104,10 @@ public:
         render->display_ = display;
         render->sampling_mode_ = sampling_mode;
         renderers_.push_back(render);
-        renderers_.back()->init(config_file, stream_id);
+        if (!renderers_.back()->init(config_file, stream_id)) {
+            std::cerr << "Failed to initialize render: " << render_name << std::endl;
+            return nullptr;
+        }
         printf("Created render: %s\n", render->title_.c_str());
         return renderers_.back();
     }

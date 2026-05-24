@@ -218,12 +218,15 @@ private:
             std::cerr<<"Unhandled error in decode_loop"<<std::endl;
         }
 
+        running_flg_ = false;
+        std::lock_guard<std::mutex> lock(mutex_);
+        has_new_frame_flg_ = false;
         if (buffer) av_free(buffer);
         if (pFrameBGR) av_frame_free(&pFrameBGR);
-        running_flg_ = false;
         av_frame_free(&pFrame);
         av_packet_free(&packet);
         sws_freeContext(sws_ctx);
+        sws_ctx = nullptr;
 
     } // End of decode_loop
 
@@ -231,17 +234,17 @@ public:
     StreamDecoder(const std::string& stream_url) : stream_url_(stream_url) {}
 
     ~StreamDecoder() {
-        terminate();
+        decoder_terminate();
     }
 
-    bool terminate() {
+    bool decoder_terminate() {
         // Cancel all running loop before lock mutex to avoid deadlock
         running_flg_ = false;
+        if (decode_worker_.joinable()) decode_worker_.join();
         // Prevent running remaining loops code
         std::lock_guard<std::mutex> lock(mutex_);
         has_new_frame_flg_ = false;
         // Join decode thread
-        if (decode_worker_.joinable()) decode_worker_.join();
         // The **-taking frees below null their argument, so they are safe to
         // call twice. sws_freeContext takes its arg by value and does NOT null
         // it, so we must null sws_ctx ourselves to avoid a double-free when
@@ -349,7 +352,11 @@ public:
         std::string render_name = "Track " + std::to_string((int)video_renderers_.size());
         std::shared_ptr<FFmpegRenderer> render = std::make_shared<FFmpegRenderer>(render_name);
         printf("Create render: %s\n", render_name.c_str());
-        render->init(config_file, stream_id);
+        if (!render->init(config_file, stream_id)) {
+            running_flg_ = false;
+            std::cerr << "Failed to initialize render: " << render_name << std::endl;
+            return;
+        }
         render->display_ = display;
         render->sampling_mode_ = sampling_mode;
         video_renderers_.push_back(render);
@@ -447,7 +454,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         StreamDecoder decoder(url);
         if (!decoder.init()) {
             std::cerr << "Failed to init" << std::endl;
-            decoder.terminate();
+            decoder.decoder_terminate();
             return -1;
         }
         decoder.start_render_loop(args.config_file, 
@@ -455,7 +462,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
                                     args.display,
                                     args.sampling_mode);
         std::cout<<"Start terminate..."<<std::endl;
-        decoder.terminate();
+        decoder.decoder_terminate();
         std::cout<<"Done"<<std::endl;
     }
     catch (...) {

@@ -58,7 +58,7 @@ bool VideoRenderer::set_window_size(int w, int h) {
 // }
 
 
-void VideoRenderer::init(const std::string &config_file, int stream_id) {
+bool VideoRenderer::init(const std::string &config_file, int stream_id) {
     try{
         std::ifstream f(config_file.c_str());
         // Global config
@@ -101,10 +101,19 @@ void VideoRenderer::init(const std::string &config_file, int stream_id) {
 
         // Set sending timepoint after image timepoint, avoid send empty image
         send_tp_ = std::chrono::high_resolution_clock::now();
+        return true;
+    }
+    catch (const zmq::error_t &e) {
+        std::cerr << "ZMQ bind failed: " << e.what()
+                << " (errno=" << e.num() << ")\n";
+        // handle error, retry, exit, etc.
+        // exit(EXIT_FAILURE);
+        return false;
     }
     catch(const std::ifstream::failure& e){
         std::cerr<<"Error in read configuration file: " << e.what() << "\n Configuration: "<< config_file <<std::endl;
-        exit(EXIT_FAILURE);
+        // exit(EXIT_FAILURE);
+        return false;
     }
 }
 
@@ -140,7 +149,6 @@ void VideoRenderer::public_image(){
 std::mutex VideoRenderer::iteration_mutex_;
 bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) {
     std::lock_guard lock(iteration_mutex_);
-    std::thread _zmq_thread = std::thread(&VideoRenderer::public_image, render);
 
     if (render->display_){
         // printf("[%s] Run iteration data size: %ld\n", render->title_.c_str(), render->image_data_.size());
@@ -216,13 +224,8 @@ bool VideoRenderer::run_iteration(const std::shared_ptr<VideoRenderer>& render) 
             return false;
         }
     }
+    render->public_image();
     fflush(stdout); 
-
-    // render->public_image();
-    if (_zmq_thread.joinable()) {
-        _zmq_thread.join();
-    }
-
     return true;
 }
 
