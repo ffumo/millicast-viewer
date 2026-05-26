@@ -265,6 +265,7 @@ public:
         AVDictionary* opts = nullptr;
         av_dict_set(&opts, "fflags", "nobuffer", 0);
         av_dict_set(&opts, "flags", "low_delay", 0);
+        av_dict_set(&opts, "rw_timeout", "5000000", 0); // 5 seconds in microseconds
 
         if (avformat_open_input(&pFormatCtx, stream_url_.c_str(), NULL, &opts) != 0) {
             std::cerr << "Could not open stream: " << stream_url_ << std::endl;
