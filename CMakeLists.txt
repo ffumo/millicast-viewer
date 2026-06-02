@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10.0)
 
-project(millicast_viewer VERSION 0.3.0 LANGUAGES C CXX)
+project(millicast_viewer VERSION 0.3.1 LANGUAGES C CXX)
 
 include(CTest)
 
@@ -10,9 +10,10 @@ enable_testing()
 
 option( WITH_METADATA "Enable metadata into frame" OFF )
 
+
 ################ Millicast ####################
 set(MillicastLIB_DIR "${PROJECT_SOURCE_DIR}/lib/millicast")
-set(CommonSRC_DIR "${MillicastLIB_DIR}/share/millicastsdk/examples/common")
+set(MillicastCommSRC_DIR "${MillicastLIB_DIR}/share/millicastsdk/examples/common")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     message("Building on macOS")
@@ -62,6 +63,7 @@ find_library(AVFORMAT_LIB avformat PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
 find_library(AVCODEC_LIB  avcodec  PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
 find_library(AVUTIL_LIB   avutil   PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
 find_library(SWSCALE_LIB  swscale  PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
+find_library(AVDEVICE_LIB  avdevice  PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
 
 # Path to the version header in your local build
 set(VERSION_HEADER "${FFMPEG_ROOT}/include/libavutil/ffversion.h")
@@ -76,7 +78,7 @@ endif()
 
 # message(STATUS "Detected FFmpeg (libavcodec) version: ${AVCODEC_VERSION}")
 
-set(FFMPEG_LIBRARIES ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB})
+set(FFMPEG_LIBRARIES ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB} ${AVDEVICE_LIB})
 #################################################
 
 
@@ -95,6 +97,7 @@ configure_file(build_info.h.in build_info.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 
+# 1. millicast_viewer
 add_executable(millicast_viewer
     millicast_viewer.cpp
     ${PROJECT_SOURCE_DIR}/src/program_info.hpp
@@ -103,8 +106,8 @@ add_executable(millicast_viewer
     ${PROJECT_SOURCE_DIR}/src/millicast_renderer.hpp
     ${PROJECT_SOURCE_DIR}/src/video_renderer.cpp
     ${PROJECT_SOURCE_DIR}/src/video_renderer.hpp
-    ${CommonSRC_DIR}/utils.cpp
-    ${CommonSRC_DIR}/utils.h
+    ${MillicastCommSRC_DIR}/utils.cpp
+    ${MillicastCommSRC_DIR}/utils.h
     ${PROJECT_SOURCE_DIR}/3rd/json/nlohmann/json.hpp
     ${PROJECT_SOURCE_DIR}/3rd/argparse/argparse.hpp
 )
@@ -114,7 +117,7 @@ target_include_directories (millicast_viewer PUBLIC
     ${OpenCV_INCLUDE_DIRS}
     ${cppzmq_INCLUDE_DIR}
     ${ZeroMQ_INCLUDE_DIR}
-    ${CommonSRC_DIR}
+    ${MillicastCommSRC_DIR}
     ${PROJECT_SOURCE_DIR}/3rd/json/
     ${PROJECT_SOURCE_DIR}/3rd/argparse/
 )
@@ -153,45 +156,7 @@ endmacro()
 endif()
 
 
-set(CPACK_PROJECT_NAME ${PROJECT_NAME})
-set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
-include(CPack)
-
-
-# # 1. Define your local path
-# set(FFMPEG_ROOT "${PROJECT_SOURCE_DIR}/lib/ffmpeg")
-
-# # 2. Set Include Directories
-# # Assuming headers are in ../lib/ffmpeg/include
-# set(FFMPEG_INCLUDE_DIRS "${FFMPEG_ROOT}/include")
-
-# # 3. Set Library Paths manually
-# # This handles the specific .dylib (macOS) or .so files in your local folder
-
-# find_library(AVFORMAT_LIB avformat PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
-# find_library(AVCODEC_LIB  avcodec  PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
-# find_library(AVUTIL_LIB   avutil   PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
-# find_library(SWSCALE_LIB  swscale  PATHS "${FFMPEG_ROOT}/lib" NO_DEFAULT_PATH)
-
-# # Path to the version header in your local build
-# set(VERSION_HEADER "${FFMPEG_ROOT}/include/libavutil/ffversion.h")
-
-# if(EXISTS "${VERSION_HEADER}")
-#     file(STRINGS "${VERSION_HEADER}" FFMPEG_VERSION_LINE REGEX "#define FFMPEG_VERSION")
-#     string(REGEX MATCH "\"(.*)\"" FFMPEG_VERSION "${FFMPEG_VERSION_LINE}")
-#     set(FFMPEG_VERSION ${CMAKE_MATCH_1})
-#     message(STATUS "Manual Parse - FFmpeg Version: ${FFMPEG_VERSION}")
-#     execute_process(COMMAND echo "${FFMPEG_VERSION}" OUTPUT_VARIABLE FFMPEG_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE)
-# endif()
-
-# # message(STATUS "Detected FFmpeg (libavcodec) version: ${AVCODEC_VERSION}")
-
-# set(FFMPEG_LIBRARIES ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB} ${SWSCALE_LIB})
-
-# 4. Find OpenCV (standard way)
-# find_package(OpenCV REQUIRED)
-
-# 5. Build
+# 2. ffmpeg_viewer
 add_executable(ffmpeg_viewer 
     ffmpeg_viewer.cpp
     ${PROJECT_SOURCE_DIR}/src/ffmpeg_renderer.cpp
@@ -221,3 +186,63 @@ target_link_libraries(ffmpeg_viewer PUBLIC
     ${OpenCV_LIBS}
 )
 
+if(0)
+# 3. millicast_audio
+add_executable(millicast_audio 
+    millicast_audio.cpp
+    ${PROJECT_SOURCE_DIR}/src/millicast_audio_renderer.cpp
+    ${PROJECT_SOURCE_DIR}/src/millicast_audio_renderer.hpp
+    ${MillicastCommSRC_DIR}/utils.cpp
+    ${MillicastCommSRC_DIR}/utils.h
+    ${PROJECT_SOURCE_DIR}/3rd/json/nlohmann/json.hpp
+    ${PROJECT_SOURCE_DIR}/3rd/argparse/argparse.hpp
+    ${PROJECT_SOURCE_DIR}/src/program_info.hpp
+    ${PROJECT_SOURCE_DIR}/src/program_info.cpp
+)
+set_target_properties( millicast_audio PROPERTIES CXX_STANDARD 17 )
+
+target_include_directories(millicast_audio PRIVATE 
+    ${cppzmq_INCLUDE_DIR}
+    ${ZeroMQ_INCLUDE_DIR}
+    ${MillicastCommSRC_DIR}
+    ${PROJECT_SOURCE_DIR}/src/
+    ${PROJECT_SOURCE_DIR}/3rd/json/
+    ${PROJECT_SOURCE_DIR}/3rd/argparse/
+)
+
+target_link_libraries(millicast_audio PUBLIC 
+    ${ZeroMQ_LIBRARY}
+    Millicast::MillicastSDK
+)
+
+
+# 2. ffmpeg_viewer
+add_executable(ffmpeg_audio_sample 
+    ffmpeg_audio_sample.cpp
+    ${PROJECT_SOURCE_DIR}/3rd/json/nlohmann/json.hpp
+    ${PROJECT_SOURCE_DIR}/3rd/argparse/argparse.hpp
+    ${PROJECT_SOURCE_DIR}/src/program_info.hpp
+    ${PROJECT_SOURCE_DIR}/src/program_info.cpp
+)
+set_target_properties( ffmpeg_audio_sample PROPERTIES CXX_STANDARD 17 )
+
+target_include_directories(ffmpeg_audio_sample PRIVATE 
+    ${FFMPEG_INCLUDE_DIRS} 
+    ${cppzmq_INCLUDE_DIR}
+    ${ZeroMQ_INCLUDE_DIR}
+    ${PROJECT_SOURCE_DIR}/src/
+    ${PROJECT_SOURCE_DIR}/3rd/json/
+    ${PROJECT_SOURCE_DIR}/3rd/argparse/
+)
+
+target_link_libraries(ffmpeg_audio_sample PUBLIC 
+    ${FFMPEG_LIBRARIES} 
+    ${ZeroMQ_LIBRARY}
+)
+
+
+endif(0)
+
+set(CPACK_PROJECT_NAME ${PROJECT_NAME})
+set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
+include(CPack)

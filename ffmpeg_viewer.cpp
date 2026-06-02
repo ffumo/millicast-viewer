@@ -58,6 +58,8 @@ private:
     // Extra info from decode loop
     std::string decode_info_ext_ = "";
 
+    std::atomic<bool> interrupt_flag_{false};
+
     // FFmpeg state
     AVFormatContext* pFormatCtx = nullptr;
     AVCodecContext* pCodecCtx = nullptr;
@@ -240,6 +242,7 @@ public:
     bool decoder_terminate() {
         // Cancel all running loop before lock mutex to avoid deadlock
         running_flg_ = false;
+        interrupt_flag_.store(true);
         if (decode_worker_.joinable()) decode_worker_.join();
         // Prevent running remaining loops code
         std::lock_guard<std::mutex> lock(mutex_);
@@ -260,12 +263,17 @@ public:
 
     bool init() {
         avformat_network_init();
-        
+                
+        // Before opening
+        pFormatCtx = avformat_alloc_context();
+        pFormatCtx->interrupt_callback.callback = decode_interrupt_cb;
+        pFormatCtx->interrupt_callback.opaque = &interrupt_flag_;
+
         //  set AV options
         AVDictionary* opts = nullptr;
         av_dict_set(&opts, "fflags", "nobuffer", 0);
         av_dict_set(&opts, "flags", "low_delay", 0);
-        av_dict_set(&opts, "rw_timeout", "5000000", 0); // 5 seconds in microseconds
+        // av_dict_set(&opts, "rw_timeout", "5000000", 0); // 5 seconds in microseconds
 
         if (avformat_open_input(&pFormatCtx, stream_url_.c_str(), NULL, &opts) != 0) {
             std::cerr << "Could not open stream: " << stream_url_ << std::endl;
@@ -331,6 +339,12 @@ public:
         running_flg_ = true;
         decode_worker_ = std::thread(&StreamDecoder::decode_loop, this);
         return true;
+    }
+
+    static int decode_interrupt_cb(void *ctx)
+    {
+        auto flag = static_cast<std::atomic<bool>*>(ctx);
+        return flag->load() ? 1 : 0;
     }
 
     /************ Thread safe of starting render ***************/

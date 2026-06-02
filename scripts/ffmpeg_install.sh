@@ -35,6 +35,8 @@ esac
   --enable-openssl \
   --enable-nonfree \
   --enable-avdevice \
+  --enable-indevs \
+  --enable-outdevs \
   --enable-indev=${INDEV_FLAG} \
   --enable-protocol=rtp,rtsp,udp,tcp,http,rtmp,rtmps,https \
   --cc="gcc -fPIC"
