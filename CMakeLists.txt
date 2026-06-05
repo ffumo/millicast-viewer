@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10.0)
 
-project(millicast_viewer VERSION 0.3.1 LANGUAGES C CXX)
+project(millicast_viewer VERSION 0.3.2 LANGUAGES C CXX)
 
 include(CTest)
 

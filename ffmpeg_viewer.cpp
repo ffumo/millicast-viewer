@@ -73,6 +73,17 @@ private:
     AVFrame* pFrameBGR = nullptr;
     struct SwsContext* sws_ctx = nullptr;
 
+    // Danger lag threshold 5000ms, reset software
+    const long danger_lag_thrd = 5000; 
+    // Drifted lag threshold 1000ms, drop frame
+    const long drifted_lag_thrd = 1000; 
+    // Long drifted lag threshold 5000ms, reset software
+    const long long_drifted_lag_thrd = 5000; 
+    // Stable frame under threshold 150ms
+    const long frame_stable_thrd = 150; 
+    // Frame stable duration for reset DTS 3000ms
+    const int dts_reset_dur = 3000;
+
     // Decode loop function
     void decode_loop() {
         try {
@@ -141,12 +152,16 @@ private:
                             if (time_diff < 0) time_diff = 0;
 
                             // Danger lag detected
-                            if (time_diff > 5000) {
-                                std::cerr<<"[ERR] Critical lag detected: " << time_diff <<" ms"<< std::endl;
-                                throw std::runtime_error("[ERR] Critical lag detected. Reconnecting stream to reset hardware buffers...");
+                            if (time_diff > danger_lag_thrd) {
+                                std::stringstream ss;
+                                ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
+                                ss << " [ERR] Critical lag detected: ";
+                                ss << time_diff<<" ms. Reconnecting stream to reset hardware buffers..."<<std::endl;
+                                std::cerr<<ss.str();
+                                throw std::runtime_error(ss.str());
                             }
                             // DRIFT DETECTION: If stream time is > 500ms behind real time, drop it!
-                            else if (!frame_drifted_flag && (time_diff > 500)) {
+                            else if (!frame_drifted_flag && (time_diff > drifted_lag_thrd)) {
                                 frame_drifted_flag = true;
                                 drift_start_time = now;
                                 std::stringstream ss;
@@ -155,15 +170,16 @@ private:
                                 ss << " Time diff: "<<time_diff<<" ms"<<std::endl;
                                 decode_info += ss.str();
                             }
-                            else if (time_diff < 150) {
+                            else if (time_diff < frame_stable_thrd) {
                                 if (frame_drifted_flag) stable_start_time = now;
                                 frame_drifted_flag = false;
 
                                 auto stable_dur = std::chrono::duration_cast<std::chrono::milliseconds>(now - stable_start_time).count();
-                                if (is_keyframe && (time_diff > 35) && (stable_dur > 3000)) {
+                                if (is_keyframe && (time_diff > 35) && (stable_dur > dts_reset_dur)) {
                                     first_dts = packet->dts;
                                     stream_start_time = now;
                                     stable_start_time = now;
+                                    avcodec_flush_buffers(pCodecCtx);  // ← FIX: UNCOMMENT THIS LINE
                                     std::stringstream ss;
                                     ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
                                     ss << " Reinit the first DTS.";
@@ -174,16 +190,24 @@ private:
                         }
 
                         // Reset due to long drifting
-                        auto elapsed_drift = std::chrono::duration_cast<std::chrono::milliseconds>(now - drift_start_time).count();
-                        if (frame_drifted_flag && (elapsed_drift > 5000)) {
-                            std::cerr<<"[ERR] Long drifting detected: " << elapsed_drift <<" ms"<< std::endl;
-                            throw std::runtime_error("[ERR] Long drifting detected. Reconnecting stream to reset hardware buffers...");
-                        }
+                        if (frame_drifted_flag) {
+                            auto elapsed_drift = std::chrono::duration_cast<std::chrono::milliseconds>(now - drift_start_time).count();
+                            if (elapsed_drift > long_drifted_lag_thrd) {
+                                std::stringstream ss;
+                                ss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
+                                ss << " [ERR] Long drifting detected: ";
+                                ss << elapsed_drift<<" ms. Reconnecting stream to reset hardware buffers..."<<std::endl;
+                                std::cerr<<ss.str();
+                                throw std::runtime_error(ss.str());
+                            }
 
-                        // Crucial: Only drop safely if it's NOT a keyframe (to avoid breaking the group of pictures)
-                        if (frame_drifted_flag && !is_keyframe) {
-                            av_packet_unref(packet);
-                            continue; // Skip decoding this frame entirely
+                            if (!is_keyframe) {
+                                // FIX: Add avcodec_flush_buffers(pCodecCtx); before av_packet_unref()
+                                // This ensures the codec outputs only current/future frames, not old buffered ones.
+                                avcodec_flush_buffers(pCodecCtx);  // ← FIX: UNCOMMENT THIS LINE
+                                av_packet_unref(packet);
+                                continue; // Skip decoding this frame entirely
+                            }
                         }
 
                         if (avcodec_send_packet(pCodecCtx, packet) == 0) {
