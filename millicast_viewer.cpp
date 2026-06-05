@@ -29,6 +29,7 @@
 #include "src/program_info.hpp"
 #include "src/video_renderer.hpp"
 #include "src/millicast_renderer.hpp"
+#include "src/audio_device_selector.hpp"
 // #endif
 
 #include "build_info.h"
@@ -65,7 +66,7 @@ millicast::Viewer::Credentials get_stream_credentials(std::string acc_id, std::s
 class TrackManager {
 
 public:
-    TrackManager() = default;
+    TrackManager(bool audio_on=false): audio_on(audio_on) {};
     void start_render_loop(std::string config_file, int stream_id=1, bool display=false, bool sampling_mode=false) {
         // wait for the first track to come before running the render loop
         {
@@ -194,16 +195,17 @@ public:
         cv_.notify_one();
     }
 
-    // void add_audio_track(millicast::RtsRemoteAudioTrack* track) {
-    //     audio_tracks_.push_back(std::move(track));
-    // }
+    void add_audio_track(millicast::RtsRemoteAudioTrack* track) {
+        if (audio_on) audio_tracks_.push_back(std::move(track));
+    }
 
+    const bool audio_on;
 private:
     std::mutex mutex_;
     std::condition_variable_any cv_;
     std::deque<millicast::RtsRemoteVideoTrack*> tracks_to_render_;
     std::vector<millicast::RtsRemoteVideoTrack*> tracks_;
-    // std::vector<millicast::RtsRemoteAudioTrack*> audio_tracks_;
+    std::vector<millicast::RtsRemoteAudioTrack*> audio_tracks_;
     std::vector<millicast::EventConnectionPtr> handlers_;
     std::vector<std::shared_ptr<MillicastRenderer>> renderers_;
 };
@@ -266,13 +268,13 @@ TrackManager& track_manager) {
                     // vid_track->enable_frame_metadata(true);
                     track_manager.add_video_track(vid_track);
                 } 
-                else {
-                    // auto at = evt.track.as_audio();
-                    // at->enable().on_result([]() {
-                    //     millicast::Logger::log("Rts Audio track enabled successfully",
-                    //                         millicast::LogLevel::MC_LOG);
-                    // });
-                    // track_manager.add_audio_track(at);
+                else if(track_manager.audio_on) {
+                    auto at = evt.track.as_audio();
+                    at->enable().on_result([]() {
+                        millicast::Logger::log("Rts Audio track enabled successfully",
+                                            millicast::LogLevel::MC_LOG);
+                    });
+                    track_manager.add_audio_track(at);
                 }
             }
         ));
@@ -293,56 +295,46 @@ void disconnect_event_handlers(
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
-    // std::string version = build_info::version +
-    //                         "\nSDK version: " + build_info::millicast_sdk_version + 
-    //                         "\nBuild time " + build_info::build_date + " " + build_info::build_time;
-    // argparse::ArgumentParser program("Millicast viewer", version);
-
-    // program.add_argument("-c", "--config")
-    //     // .default_value(std::string{"configs/sample_config.json"})
-    //     .required()
-    //     .help("configuration file");
-
-    // program.add_argument("--id")
-    //     .default_value(1)
-    //     .help("stream id in configuration file")
-    //     .scan<'i', int>();
-
-    // program.add_argument("-d", "--display")
-    //     .help("enable display")
-    //     .default_value(false)
-    //     // .default_value(true)
-    //     .implicit_value(true);
-
-    // program.add_argument("-q", "--quiet")
-    //     .help("disable showing SDK stats")
-    //     .default_value(false)
-    //     // .default_value(true)
-    //     .implicit_value(true);
-
-    // try {
-    //     program.parse_args(argc, argv);
-    // }
-    // catch (const std::exception& err) {
-    //     std::cerr << err.what() << std::endl;
-    //     std::cerr << program;
-    //     std::exit(EXIT_FAILURE);
-    // }
-    // auto config_file = program.get<std::string>("--config");  // "orange"
-    // auto display = program["--display"] == true;
-    // auto stream_id = program.get<int>("--id");
-    // auto disable_stats = program["--quiet"] == true;
-
-    // std::cout << "Version: "<< version << std::endl;
-    // std::cout << "config_file: "<< config_file << std::endl;
-    // std::cout << "display: "<< display << std::endl;
-    // std::cout << "stream_id: "<< stream_id << std::endl;
-    // std::cout << "disable_stats: "<< disable_stats << std::endl;
-
-
     ProgramInfo args = ProgramInfo("Millicast Viewer");
     args.parse_arguments(argc, argv);
     args.print_args();
+
+    // Handle audio device listing
+    try {
+        auto devices = AudioDeviceSelector::get_output_devices();
+        
+        // If --list-audio-devices is requested, print and exit
+        if (args.is_argument_used("--list-audio-devices")) {
+            
+            AudioDeviceSelector::print_devices(devices);
+            std::cout << "Current default device: " << AudioDeviceSelector::get_default_output_device() << std::endl;
+            return EXIT_SUCCESS;
+        }
+
+        // If audio device is specified, try to set it
+        if (!args.audio_device.empty() && args.audio_device != "default") {
+            std::cout << "Attempting to set audio device to: " << args.audio_device << std::endl;
+            
+            // Try to match by name or ID
+            bool found = false;
+            for (const auto& device : devices) {
+                if (device.name == args.audio_device || device.id == args.audio_device) {
+                    AudioDeviceSelector::set_output_device(device.id);
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                std::cerr << "Warning: Audio device '" << args.audio_device << "' not found." << std::endl;
+                AudioDeviceSelector::print_devices(devices);
+                std::cerr << "Continuing with default device..." << std::endl;
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error accessing audio devices: " << e.what() << std::endl;
+        std::cerr << "Continuing with default audio device..." << std::endl;
+    }
 
     nlohmann::json config_;
     try{
@@ -382,7 +374,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 
         // These are helpers for management of the incoming tracks of audio/video as
         // well as there event handlers/
-        auto track_manager = std::make_unique<TrackManager>();
+        auto track_manager = std::make_unique<TrackManager>(args.audio);
         setup_viewer_event_handlers(viewer.get(), viewer_handlers, *track_manager);
 
         // Set the credentials and enable the stats
@@ -412,7 +404,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         millicast::ViewerOption sopts{};
-        sopts.disable_audio=true;
+        sopts.disable_audio = !args.audio;
+
         std::cout<<"subscribe stream"<<std::endl;
         wait(viewer->subscribe(sopts));
 

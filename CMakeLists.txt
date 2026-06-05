@@ -102,6 +102,8 @@ add_executable(millicast_viewer
     millicast_viewer.cpp
     ${PROJECT_SOURCE_DIR}/src/program_info.hpp
     ${PROJECT_SOURCE_DIR}/src/program_info.cpp
+    ${PROJECT_SOURCE_DIR}/src/audio_device_selector.hpp
+    ${PROJECT_SOURCE_DIR}/src/audio_device_selector.cpp
     ${PROJECT_SOURCE_DIR}/src/millicast_renderer.cpp
     ${PROJECT_SOURCE_DIR}/src/millicast_renderer.hpp
     ${PROJECT_SOURCE_DIR}/src/video_renderer.cpp
@@ -136,6 +138,17 @@ if( WITH_METADATA )
   target_compile_definitions( millicast_viewer PRIVATE WITH_METADATA )
 endif()
 
+# Platform-specific audio libraries for millicast_viewer
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    # macOS - link CoreAudio
+    target_link_libraries(millicast_viewer PUBLIC "-framework CoreAudio" "-framework CoreFoundation")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Linux - link PulseAudio
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(PULSE REQUIRED libpulse)
+    target_include_directories(millicast_viewer PRIVATE ${PULSE_INCLUDE_DIRS})
+    target_link_libraries(millicast_viewer PUBLIC ${PULSE_LIBRARIES})
+endif()
 
 if (WIN32)
 macro(copy_millicast_deps_to_build _target_name)
@@ -187,38 +200,12 @@ target_link_libraries(ffmpeg_viewer PUBLIC
 )
 
 if(0)
-# 3. millicast_audio
-add_executable(millicast_audio 
-    millicast_audio.cpp
-    ${PROJECT_SOURCE_DIR}/src/millicast_audio_renderer.cpp
-    ${PROJECT_SOURCE_DIR}/src/millicast_audio_renderer.hpp
-    ${MillicastCommSRC_DIR}/utils.cpp
-    ${MillicastCommSRC_DIR}/utils.h
-    ${PROJECT_SOURCE_DIR}/3rd/json/nlohmann/json.hpp
-    ${PROJECT_SOURCE_DIR}/3rd/argparse/argparse.hpp
-    ${PROJECT_SOURCE_DIR}/src/program_info.hpp
-    ${PROJECT_SOURCE_DIR}/src/program_info.cpp
-)
-set_target_properties( millicast_audio PROPERTIES CXX_STANDARD 17 )
 
-target_include_directories(millicast_audio PRIVATE 
-    ${cppzmq_INCLUDE_DIR}
-    ${ZeroMQ_INCLUDE_DIR}
-    ${MillicastCommSRC_DIR}
-    ${PROJECT_SOURCE_DIR}/src/
-    ${PROJECT_SOURCE_DIR}/3rd/json/
-    ${PROJECT_SOURCE_DIR}/3rd/argparse/
-)
-
-target_link_libraries(millicast_audio PUBLIC 
-    ${ZeroMQ_LIBRARY}
-    Millicast::MillicastSDK
-)
-
-
-# 2. ffmpeg_viewer
+# 2. ffmpeg_audio_sample
 add_executable(ffmpeg_audio_sample 
     ffmpeg_audio_sample.cpp
+    ${PROJECT_SOURCE_DIR}/src/audio_device_selector.cpp
+    ${PROJECT_SOURCE_DIR}/src/audio_device_selector.hpp
     ${PROJECT_SOURCE_DIR}/3rd/json/nlohmann/json.hpp
     ${PROJECT_SOURCE_DIR}/3rd/argparse/argparse.hpp
     ${PROJECT_SOURCE_DIR}/src/program_info.hpp
@@ -240,8 +227,20 @@ target_link_libraries(ffmpeg_audio_sample PUBLIC
     ${ZeroMQ_LIBRARY}
 )
 
+# Platform-specific audio libraries for ffmpeg_audio_sample
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    # macOS - link CoreAudio
+    target_link_libraries(ffmpeg_audio_sample PUBLIC "-framework CoreAudio" "-framework CoreFoundation")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Linux - link PulseAudio
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(PULSE REQUIRED libpulse)
+    target_include_directories(ffmpeg_audio_sample PRIVATE ${PULSE_INCLUDE_DIRS})
+    target_link_libraries(ffmpeg_audio_sample PUBLIC ${PULSE_LIBRARIES})
+endif()
 
-endif(0)
+
+endif(1)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
