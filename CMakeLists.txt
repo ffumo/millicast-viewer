@@ -180,8 +180,38 @@ target_include_directories(ffmpeg_viewer PRIVATE
     ${PROJECT_SOURCE_DIR}/3rd/argparse/
 )
 
-target_link_libraries(ffmpeg_viewer PUBLIC 
-    ${FFMPEG_LIBRARIES} 
+target_link_libraries(ffmpeg_viewer PUBLIC
+    ${FFMPEG_LIBRARIES}
+    ${ZeroMQ_LIBRARY}
+    ${OpenCV_LIBS}
+)
+
+# 2b. ffmpeg_viewer_reconnect (live-edge latency estimator + in-process reconnect)
+add_executable(ffmpeg_viewer_reconnect
+    ffmpeg_viewer_reconnect.cpp
+    ${PROJECT_SOURCE_DIR}/src/ffmpeg_renderer.cpp
+    ${PROJECT_SOURCE_DIR}/src/ffmpeg_renderer.hpp
+    ${PROJECT_SOURCE_DIR}/src/video_renderer.cpp
+    ${PROJECT_SOURCE_DIR}/src/video_renderer.hpp
+    ${PROJECT_SOURCE_DIR}/3rd/json/nlohmann/json.hpp
+    ${PROJECT_SOURCE_DIR}/3rd/argparse/argparse.hpp
+    ${PROJECT_SOURCE_DIR}/src/program_info.hpp
+    ${PROJECT_SOURCE_DIR}/src/program_info.cpp
+)
+set_target_properties( ffmpeg_viewer_reconnect PROPERTIES CXX_STANDARD 17 )
+
+target_include_directories(ffmpeg_viewer_reconnect PRIVATE
+    ${FFMPEG_INCLUDE_DIRS}
+    ${OpenCV_INCLUDE_DIRS}
+    ${cppzmq_INCLUDE_DIR}
+    ${ZeroMQ_INCLUDE_DIR}
+    ${PROJECT_SOURCE_DIR}/src/
+    ${PROJECT_SOURCE_DIR}/3rd/json/
+    ${PROJECT_SOURCE_DIR}/3rd/argparse/
+)
+
+target_link_libraries(ffmpeg_viewer_reconnect PUBLIC
+    ${FFMPEG_LIBRARIES}
     ${ZeroMQ_LIBRARY}
     ${OpenCV_LIBS}
 )
