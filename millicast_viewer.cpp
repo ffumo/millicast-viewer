@@ -10,6 +10,7 @@
 #include <thread>
 #include <chrono>
 #include <stdio.h>
+#include <cstdlib>
 
 #include <millicast-sdk/mc_logging.h>
 #include <millicast-sdk/renderer.h>
@@ -293,52 +294,6 @@ void disconnect_event_handlers(
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
-    // std::string version = build_info::version +
-    //                         "\nSDK version: " + build_info::millicast_sdk_version + 
-    //                         "\nBuild time " + build_info::build_date + " " + build_info::build_time;
-    // argparse::ArgumentParser program("Millicast viewer", version);
-
-    // program.add_argument("-c", "--config")
-    //     // .default_value(std::string{"configs/sample_config.json"})
-    //     .required()
-    //     .help("configuration file");
-
-    // program.add_argument("--id")
-    //     .default_value(1)
-    //     .help("stream id in configuration file")
-    //     .scan<'i', int>();
-
-    // program.add_argument("-d", "--display")
-    //     .help("enable display")
-    //     .default_value(false)
-    //     // .default_value(true)
-    //     .implicit_value(true);
-
-    // program.add_argument("-q", "--quiet")
-    //     .help("disable showing SDK stats")
-    //     .default_value(false)
-    //     // .default_value(true)
-    //     .implicit_value(true);
-
-    // try {
-    //     program.parse_args(argc, argv);
-    // }
-    // catch (const std::exception& err) {
-    //     std::cerr << err.what() << std::endl;
-    //     std::cerr << program;
-    //     std::exit(EXIT_FAILURE);
-    // }
-    // auto config_file = program.get<std::string>("--config");  // "orange"
-    // auto display = program["--display"] == true;
-    // auto stream_id = program.get<int>("--id");
-    // auto disable_stats = program["--quiet"] == true;
-
-    // std::cout << "Version: "<< version << std::endl;
-    // std::cout << "config_file: "<< config_file << std::endl;
-    // std::cout << "display: "<< display << std::endl;
-    // std::cout << "stream_id: "<< stream_id << std::endl;
-    // std::cout << "disable_stats: "<< disable_stats << std::endl;
-
 
     ProgramInfo args = ProgramInfo("Millicast Viewer");
     args.parse_arguments(argc, argv);
@@ -387,10 +342,16 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
 
         // Set the credentials and enable the stats
         json stream_config = config_["source"]["entries"][0];
+
         std::string stream_token = "";
-        if (stream_config.contains("token")) {
+        const char* token_value = std::getenv("STREAM_TOKEN");
+        if (token_value) {
+            stream_token = std::string(token_value);
+        }
+        else if (stream_config.contains("token")) {
             stream_token = stream_config["token"];
         }
+
         std::cout<<"Get stream: "<< stream_config <<std::endl;
         wait(viewer->set_credentials(get_stream_credentials(stream_config["account_id"], stream_config["stream_name"], stream_token)));
 
