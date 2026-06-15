@@ -348,6 +348,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         if (token_value) {
             stream_token = std::string(token_value);
         }
+        else if (args.stream_token != "") {
+            stream_token = args.stream_token;
+        }
         else if (stream_config.contains("token")) {
             stream_token = stream_config["token"];
         }

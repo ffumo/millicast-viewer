@@ -7,7 +7,7 @@
 ProgramInfo::ProgramInfo(std::string name): name(name), 
     config_file(_config_file), display(_display), 
     disable_stats(_disable_stats), stream_id(_stream_id), 
-    debug(_debug), sampling_mode(_sampling_mode) {
+    debug(_debug), sampling_mode(_sampling_mode), stream_token(_stream_token) {
     
     version = build_info::version +
                             "\nSDK version: " + build_info::millicast_sdk_version + 
@@ -33,6 +33,10 @@ ProgramInfo::ProgramInfo(std::string name): name(name),
         // .default_value(true)
         .implicit_value(true);
 
+    program_ptr->add_argument("-t", "--token")
+        .help("Stream token, can also set by STREAM_TOKEN env")
+        .default_value("");
+
     program_ptr->add_argument("-q", "--quiet")
         .help("disable showing SDK stats")
         .default_value(false)
@@ -57,6 +61,7 @@ void ProgramInfo::parse_arguments(int argc, char* argv[]){
     try {
         program_ptr->parse_args(argc, argv);
         _config_file = program_ptr->get<std::string>("--config");  // "orange"
+        _stream_token = program_ptr->get<std::string>("--token");
         _display = program_ptr->get<bool>("--display");
         _stream_id = program_ptr->get<int>("--id");
         _disable_stats = program_ptr->get<bool>("--quiet");
@@ -73,6 +78,7 @@ void ProgramInfo::parse_arguments(int argc, char* argv[]){
 void ProgramInfo::print_args() {
     std::cout << "Version: "<< version << std::endl;
     std::cout << "config_file: "<< config_file << std::endl;
+    std::cout << "stream_token: "<< stream_token << std::endl;
     std::cout << "display: "<< display << std::endl;
     std::cout << "stream_id: "<< stream_id << std::endl;
     std::cout << "disable_stats: "<< disable_stats << std::endl;

@@ -10,6 +10,7 @@ private:
     std::string version="";
     std::shared_ptr<argparse::ArgumentParser> program_ptr;
     std::string _config_file;
+    std::string _stream_token;
     int _stream_id;
     bool _display;
     bool _debug;
@@ -22,6 +23,7 @@ public:
     void print_args();
     void parse_arguments(int argc, char* argv[]);
     const std::string & config_file;
+    const std::string & stream_token;
     const int& stream_id;
     const bool& display;
     const bool& debug;
