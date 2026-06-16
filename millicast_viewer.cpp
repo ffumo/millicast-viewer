@@ -344,15 +344,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[]) {
         json stream_config = config_["source"]["entries"][0];
 
         std::string stream_token = "";
-        const char* token_value = std::getenv("STREAM_TOKEN");
-        if (token_value) {
-            stream_token = std::string(token_value);
-        }
-        else if (args.stream_token != "") {
+        const char* token_value_env = std::getenv("STREAM_TOKEN");
+        if (args.stream_token != "") {
             stream_token = args.stream_token;
         }
-        else if (stream_config.contains("token")) {
+        else if (stream_config.contains("token") && (stream_config["token"] != "")) {
             stream_token = stream_config["token"];
+        }
+        else if (token_value_env) {
+            stream_token = std::string(token_value_env);
         }
 
         std::cout<<"Get stream: "<< stream_config <<std::endl;

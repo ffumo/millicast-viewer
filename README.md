@@ -98,7 +98,10 @@ sudo loginctl enable-linger msservice
         ```
         tar -xvf 3rd/ffmpeg-8.1.1.tar.xz --directory 3rd/ && mv 3rd/ffmpeg-8.1.1 3rd/ffmpeg
         ```
-
+        - Build FFmpeg
+        ```
+        ./scripts/ffmpeg_install.sh
+        ```
 
     - [OpenCV](https://docs.opencv.org/4.x/d7/d9f/tutorial_linux_install.html) for image processing
         ```shell
@@ -144,7 +147,7 @@ sudo loginctl enable-linger msservice
         unzip -j 3rd/argparse.zip argparse-3.1/include/argparse/argparse.hpp -d 3rd/argparse/
         ```
 
-### Build app
+### Build applications
 
 Run scripts in [scripts](scripts) directory for build libs (except final build script [build.sh](script/build.sh))
 
@@ -159,23 +162,34 @@ Note: Linking error under Linux, if you meet linking error "warning: libndi.so.5
 ln -rs lib/millicast/libexec/millicastsdk/libndi.so.5.1.1 lib/millicast/libexec/millicastsdk/libndi.so.5
 ```
 
-### Run app
+### Run Millicast Viewer app
 
 After build success, app is located at [millicast_viewer](build/millicast_viewer).<br/>
 To run app, you have to source dependent libraries [source_lib.sh](script/source_lib.sh)
 ```shell
 source scripts/source_lib.sh
 
-./build/millicast_viewer
+./build/millicast_viewer --help
 ```
+
 App available options:
--  -c, --config: configuration file [required]
--  --id :stream id in configuration file [nargs=0..1] [default: 1]
--  -d, --display: enable display 
--  -q, --quiet: disable printing star logging 
+-  -h, --help     shows help message and exits 
+-  -v, --version  prints version information and exits 
+-  -c, --config   configuration file [required]
+-  --id           stream id in configuration file [nargs=0..1] [default: 1]
+-  -d, --display  enable display (on PC)
+-  -t, --token    Stream token, can also set by STREAM_TOKEN env [nargs=0..1] [default: ""]
+-  -q, --quiet    disable showing SDK stats 
+-  -s, --sample   Run viewer in sampling mode 
+-  --debug        enable debug logs 
 
 
 Configuration file contains stream information. Please refer to [sample_config.json](config/sample_config.json)
+
+
+### Run FFmpeg Viewer app
+ T.B.D
+
 
 ### Note
 
